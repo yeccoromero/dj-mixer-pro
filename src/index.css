@@ -1,0 +1,117 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Music OS Colors */
+    --background: 210 10% 94.3%; /* #f1f2f3 */
+    --foreground: 210 10% 15%;
+
+    --panel: 210 10% 84.7%; /* #d7d9db */
+    --panel-foreground: 210 10% 15%;
+
+    --deck: 210 10% 84.7%;
+    --deck-foreground: 210 10% 15%;
+
+    --knob: 0 0% 0%; /* #000000 */
+    --knob-foreground: 0 0% 100%;
+
+    --lime-accent: 80 100% 63.3%; /* #d7ff43 */
+    --aqua-accent: 175 100% 47.3%; /* #00eec4 */
+
+    --card: 210 10% 84.7%;
+    --card-foreground: 210 10% 15%;
+
+    --primary: 0 0% 0%;
+    --primary-foreground: 0 0% 100%;
+
+    --accent: 80 100% 63.3%;
+    --accent-foreground: 210 10% 10%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --muted: 210 10% 89%;
+    --muted-foreground: 210 10% 45%;
+
+    --border: 210 10% 78%;
+    --ring: 80 100% 63.3%;
+
+    --radius: 1.125rem; /* 18px */
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-inter;
+    margin: 0;
+  }
+
+  .font-inter {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  .font-space-grotesk {
+    font-family: 'Space Grotesk', monospace;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply bg-panel text-panel-foreground rounded-[18px] shadow-sm;
+  }
+
+  .deck {
+    @apply bg-deck text-deck-foreground rounded-[18px] p-6 shadow-sm;
+  }
+
+  .knob {
+    @apply bg-knob text-knob-foreground rounded-full shadow-sm;
+  }
+
+  .music-title {
+    @apply text-[28px] font-bold leading-tight font-inter;
+  }
+
+  .music-body {
+    @apply text-base font-medium font-inter;
+  }
+
+  .music-number {
+    @apply font-space-grotesk font-semibold;
+  }
+
+  .chip-lime {
+    @apply bg-lime-accent text-accent-foreground px-3 py-1 rounded-full text-sm font-medium;
+  }
+
+  .chip-aqua {
+    @apply bg-aqua-accent text-accent-foreground px-3 py-1 rounded-full text-sm font-medium;
+  }
+
+  .coverflow-card {
+    @apply transition-all duration-300 transform-gpu;
+  }
+
+  .coverflow-card.active {
+    @apply scale-105 z-10;
+  }
+
+  .coverflow-card.side {
+    @apply scale-95 opacity-80;
+  }
+}
+
+/* Custom scrollbar for the coverflow strip */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
