@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { extractYouTubeId } from '@/lib/youtubeId'
 import { fetchYouTubeOembed } from '@/lib/youtubeOembed'
+import { checkVideoEmbeddable } from '@/lib/youtubeEmbedCheck'
 import type { Track } from './DJMixer'
 
 interface AddTrackModalProps {
@@ -27,6 +28,7 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack }) => {
   const [thumbnail, setThumbnail] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [fetchingMeta, setFetchingMeta] = useState(false)
+  const [checkingEmbed, setCheckingEmbed] = useState(false)
 
   const reset = () => {
     setUrl('')
@@ -36,6 +38,7 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack }) => {
     setThumbnail(null)
     setError(null)
     setFetchingMeta(false)
+    setCheckingEmbed(false)
   }
 
   const handleUrlBlur = async () => {
@@ -53,11 +56,21 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack }) => {
     setThumbnail(meta.thumbnailUrl)
   }
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     const youtubeId = extractYouTubeId(url)
     if (!youtubeId) {
       setError('Pega una URL o ID de YouTube válido')
+      return
+    }
+
+    setError(null)
+    setCheckingEmbed(true)
+    const check = await checkVideoEmbeddable(youtubeId)
+    setCheckingEmbed(false)
+
+    if (!check.playable) {
+      setError(check.reason ?? 'Este video no se puede reproducir aquí')
       return
     }
 
@@ -147,8 +160,9 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack }) => {
             />
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" variant="lime" className="mt-2">
-            Añadir a la biblioteca
+          <Button type="submit" variant="lime" className="mt-2 gap-2" disabled={checkingEmbed}>
+            {checkingEmbed && <Loader2 className="h-4 w-4 animate-spin" />}
+            {checkingEmbed ? 'Verificando que se pueda reproducir…' : 'Añadir a la biblioteca'}
           </Button>
         </form>
       </DialogContent>

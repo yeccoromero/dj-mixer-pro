@@ -70,7 +70,12 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({
     )
   }
 
-  const activeTrack = tracks[centerIndex]
+  // `centerIndex` is only re-clamped by the effect above *after* a render, so right after
+  // a track is removed (e.g. the last/active one), `tracks` has already shrunk here while
+  // `centerIndex` still points past the end for this one render. Deriving the safe value
+  // used for everything below avoids indexing out of bounds and crashing that render.
+  const safeIndex = Math.min(centerIndex, tracks.length - 1)
+  const activeTrack = tracks[safeIndex]
 
   return (
     <div className="panel flex flex-col gap-4 p-5">
@@ -83,7 +88,7 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({
         <button
           type="button"
           onClick={() => move(-1)}
-          disabled={centerIndex === 0}
+          disabled={safeIndex === 0}
           className="knob absolute left-0 z-30 flex h-8 w-8 items-center justify-center disabled:opacity-30"
           aria-label="Anterior"
         >
@@ -93,7 +98,7 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({
         <div className="relative" style={{ width: CARD_WIDTH, height: CARD_HEIGHT }}>
           <AnimatePresence initial={false}>
             {tracks.map((track, index) => {
-              const offset = index - centerIndex
+              const offset = index - safeIndex
               if (Math.abs(offset) > VISIBLE_RADIUS) return null
               const isActive = offset === 0
 
@@ -182,7 +187,7 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({
         <button
           type="button"
           onClick={() => move(1)}
-          disabled={centerIndex >= tracks.length - 1}
+          disabled={safeIndex >= tracks.length - 1}
           className="knob absolute right-0 z-30 flex h-8 w-8 items-center justify-center disabled:opacity-30"
           aria-label="Siguiente"
         >

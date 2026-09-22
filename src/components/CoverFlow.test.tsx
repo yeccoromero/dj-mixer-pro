@@ -98,4 +98,45 @@ describe('CoverFlow', () => {
     setup()
     expect(screen.getByText(/Artist One · 2:05/)).toBeInTheDocument()
   })
+
+  it('does not crash when the active track is removed while it is the last one in the list', () => {
+    const onRemoveTrack = vi.fn()
+    const { rerender } = render(
+      <CoverFlow
+        tracks={tracks}
+        selectedTrack={null}
+        activeDeck="A"
+        onTrackSelect={vi.fn()}
+        onAddTrack={vi.fn()}
+        onRemoveTrack={onRemoveTrack}
+      />,
+    )
+
+    // Navigate to the last card (index 2) so it's the active/removable one.
+    fireEvent.click(screen.getByLabelText('Siguiente'))
+    fireEvent.click(screen.getByLabelText('Siguiente'))
+    expect(screen.getByText('Track Three — Artist Three')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByLabelText('Quitar "Track Three" de la biblioteca'))
+    expect(onRemoveTrack).toHaveBeenCalledWith('3')
+
+    // Simulate the parent (DJMixer) removing the track from the array — this used to
+    // crash the render because the carousel's centerIndex (2) briefly pointed past the
+    // end of the now-shorter (length 2) tracks array.
+    const remaining = tracks.filter((t) => t.id !== '3')
+    expect(() =>
+      rerender(
+        <CoverFlow
+          tracks={remaining}
+          selectedTrack={null}
+          activeDeck="A"
+          onTrackSelect={vi.fn()}
+          onAddTrack={vi.fn()}
+          onRemoveTrack={onRemoveTrack}
+        />,
+      ),
+    ).not.toThrow()
+
+    expect(screen.getByText('Track Two — Artist Two')).toBeInTheDocument()
+  })
 })

@@ -160,13 +160,35 @@ explícitas y separadas.
 **Duración visible:** la tarjeta activa muestra `artista · duración (m:ss)` para identificarla sin
 tener que cargarla.
 
+**Bug corregido — se colgaba al borrar la tarjeta activa cuando era la última de la lista:**
+`centerIndex` (qué tarjeta está al frente) solo se recorta a un rango válido en un `useEffect`, que
+corre *después* de que React ya renderizó con el array `tracks` más corto. Si justo se borraba la
+tarjeta activa estando en la última posición, ese primer render usaba `tracks[centerIndex]` con un
+índice que ya no existía (`undefined`), y leer `.title` de ahí tiraba un `TypeError` que rompía el
+árbol de React entero (pantalla en blanco/congelada). Se corrigió calculando un índice seguro
+(`safeIndex = Math.min(centerIndex, tracks.length - 1)`) directamente en el render, en vez de
+depender solo del efecto — así nunca se indexa fuera de rango, ni siquiera por un instante. Cubierto
+por un test de regresión que reproduce exactamente ese escenario (navegar a la última tarjeta,
+borrarla, verificar que no explota).
+
 ### Modal "Agregar pista" (`AddTrackModal.tsx`)
 
 | Control | Qué hace |
 |---|---|
 | **Campo "URL o ID de YouTube"** | Acepta un ID de 11 caracteres, una URL completa (`youtube.com/watch?v=`), un link corto (`youtu.be/`) o un link de Shorts. Se valida con `lib/youtubeId.ts#extractYouTubeId`, que **rechaza** cualquier cosa que no matchee el patrón exacto de un ID de YouTube (evita inyectar valores arbitrarios en la URL del thumbnail o en el reproductor). Al salir del campo (`onBlur`), dispara la búsqueda automática de metadatos (ver abajo) |
 | **Campos Título / Artista / Duración** | Se autocompletan desde YouTube si es posible (ver abajo); si quedan vacíos al enviar, se usan valores por defecto ("Pista sin título", "Artista desconocido", 180s). Editable en cualquier momento — lo que ya escribiste a mano nunca se sobrescribe |
-| **Botón "Añadir a la biblioteca"** | Valida el link; si es inválido muestra un error inline; si es válido, construye un `Track` y llama `onAddTrack(track)`, cierra el modal y limpia el formulario |
+| **Botón "Añadir a la biblioteca"** | Valida el formato del link; si es inválido muestra un error inline. Si el formato es válido, antes de agregarla **verifica que el video realmente se pueda reproducir aquí** (ver abajo); mientras verifica, el botón cambia a "Verificando que se pueda reproducir…" y queda deshabilitado. Si pasa la verificación, construye un `Track`, llama `onAddTrack(track)`, cierra el modal y limpia el formulario. Si no pasa, muestra el motivo exacto y el modal queda abierto con los datos intactos para probar otro link |
+
+**Verificación de reproducibilidad antes de agregar (`lib/youtubeEmbedCheck.ts`):** el endpoint
+`oEmbed` (usado para autocompletar) solo refleja el interruptor "permitir incrustar" del video — no
+detecta los bloqueos de sello/Content-ID (los mismos códigos de error 101/150 que sellos como UMPG
+usan para bloquear la reproducción fuera de YouTube), que solo se manifiestan cuando el reproductor
+real de YouTube intenta cargar el video. Por eso, al enviar el formulario se crea un
+`YT.Player` oculto (fuera de pantalla, sin controles) únicamente para observar sus eventos
+`onReady`/`onError`, y se destruye inmediatamente después — es la misma señal que ya usa cada deck,
+solo que ahora se consulta *antes* de agregar la pista a la biblioteca, no después de cargarla en un
+deck. Si no responde en 8 segundos (verificación lenta o colgada), se permite agregar igual en vez
+de bloquear una pista válida por un problema de red.
 
 **Autocompletado desde la URL original (`lib/youtubeOembed.ts`):** al pegar un link y salir del
 campo, se consulta el endpoint público `oEmbed` de YouTube (`youtube.com/oembed?url=...`) — no
@@ -209,6 +231,8 @@ altas, bajas y correcciones de duración incluidas.
 | Tap-tempo BPM (registro, reinicio por pista/silencio) | ✅ (`bpm.test.ts`, `Deck.test.tsx`) | ✅ |
 | Crossfader con curva de potencia constante | ✅ (`mixerMath.test.ts`) | ✅ |
 | Contador LED de tiempo transcurrido/restante | ✅ (`format.test.ts`) | ✅ |
+| CoverFlow — no se cuelga al borrar la tarjeta activa en la última posición | ✅ (test de regresión, confirmado que falla sin el fix) | ✅ |
+| Verificación de reproducibilidad antes de agregar (bloquea videos no embebibles) | ✅ (`AddTrackModal.test.tsx`, chequeo mockeado) | — (requiere red real hacia YouTube; el flujo de "Verificando…" se confirmó en navegador) |
 
 ---
 
