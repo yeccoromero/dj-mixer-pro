@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Play, Pause, Disc3 } from 'lucide-react'
+import { Play, Pause, Disc3, AlertTriangle } from 'lucide-react'
 import type { DeckState } from './DJMixer'
 import { Knob } from './Knob'
 import { WavePanel } from './WavePanel'
-import { loadYouTubeApi, type YouTubePlayer } from '@/lib/youtube'
+import { loadYouTubeApi, describeYouTubeError, type YouTubePlayer } from '@/lib/youtube'
+import { computeEffectiveVolume } from '@/lib/mixerMath'
 import { publishEvent } from '@/lib/sessionEvents'
 import { cn } from '@/lib/utils'
 
@@ -22,6 +23,7 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
   const containerId = `yt-player-${id}`
   const playerRef = useRef<YouTubePlayer | null>(null)
   const [ready, setReady] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const pollRef = useRef<number | null>(null)
 
   // Create the YouTube player once per deck.
@@ -36,17 +38,23 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
         events: {
           onReady: (event) => {
             playerRef.current = event.target
-            event.target.setVolume(state.volume)
+            event.target.setVolume(computeEffectiveVolume(state.volume, state.gain))
             setReady(true)
           },
           onStateChange: (event) => {
             const YTState = window.YT?.PlayerState
             if (!YTState) return
             if (event.data === YTState.PLAYING) {
+              setError(null)
               onStateChange((prev) => ({ ...prev, isPlaying: true }))
             } else if (event.data === YTState.PAUSED || event.data === YTState.ENDED) {
               onStateChange((prev) => ({ ...prev, isPlaying: false }))
             }
+          },
+          onError: (event) => {
+            setError(describeYouTubeError(event.data))
+            onStateChange((prev) => ({ ...prev, isPlaying: false }))
+            publishEvent(`Deck ${id} error: ${describeYouTubeError(event.data)}`)
           },
         },
       })
@@ -64,6 +72,7 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
   // Load a new video when the assigned track changes.
   useEffect(() => {
     if (ready && playerRef.current && state.track) {
+      setError(null)
       playerRef.current.loadVideoById(state.track.youtubeId)
     }
   }, [state.track?.youtubeId, ready])
@@ -71,8 +80,7 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
   // Crossfader volume combined with the gain knob.
   useEffect(() => {
     if (ready && playerRef.current) {
-      const effective = Math.round((state.volume / 100) * (state.gain / 100) * 100)
-      playerRef.current.setVolume(effective)
+      playerRef.current.setVolume(computeEffectiveVolume(state.volume, state.gain))
     }
   }, [state.volume, state.gain, ready])
 
@@ -91,7 +99,7 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
   }, [state.isPlaying, onStateChange])
 
   const togglePlay = () => {
-    if (!playerRef.current) return
+    if (!playerRef.current || !ready) return
     if (state.isPlaying) {
       playerRef.current.pauseVideo()
       publishEvent(`Deck ${id} en pausa`)
@@ -102,7 +110,7 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
   }
 
   const jumpToCue = () => {
-    if (!playerRef.current || !state.track) return
+    if (!playerRef.current || !ready || !state.track) return
     const target = (state.cue / 100) * state.track.duration
     playerRef.current.seekTo(target, true)
     publishEvent(`Deck ${id} salto a cue (${Math.round(target)}s)`)
@@ -132,6 +140,17 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
 
       <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black/80">
         <div id={containerId} className="h-full w-full" style={{ filter: `saturate(${0.5 + state.filter / 100})` }} />
+        {!ready && !error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-xs text-white/70">
+            Cargando reproductor…
+          </div>
+        )}
+        {error && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/80 px-3 text-center text-white">
+            <AlertTriangle className="h-5 w-5 text-lime-accent" />
+            <p className="text-xs">{error}</p>
+          </div>
+        )}
       </div>
 
       <div className="min-h-[40px]">
@@ -144,22 +163,24 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
       <div className="flex items-center justify-center gap-3">
         <button
           type="button"
+          disabled={!ready}
           onClick={(event) => {
             event.stopPropagation()
             jumpToCue()
           }}
-          className="knob flex h-11 w-11 items-center justify-center text-[10px] font-semibold uppercase"
+          className="knob flex h-11 w-11 items-center justify-center text-[10px] font-semibold uppercase disabled:cursor-not-allowed disabled:opacity-40"
         >
           Cue
         </button>
         <button
           type="button"
+          disabled={!ready}
           onClick={(event) => {
             event.stopPropagation()
             togglePlay()
           }}
           className={cn(
-            'flex h-14 w-14 items-center justify-center rounded-full text-black shadow',
+            'flex h-14 w-14 items-center justify-center rounded-full text-black shadow disabled:cursor-not-allowed disabled:opacity-40',
             id === 'A' ? 'bg-lime-accent' : 'bg-aqua-accent',
           )}
         >

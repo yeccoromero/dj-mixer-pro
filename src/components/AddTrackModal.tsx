@@ -10,25 +10,11 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { extractYouTubeId } from '@/lib/youtubeId'
 import type { Track } from './DJMixer'
 
 interface AddTrackModalProps {
   onAddTrack: (track: Track) => void
-}
-
-function extractYouTubeId(input: string): string | null {
-  const trimmed = input.trim()
-  if (/^[\w-]{11}$/.test(trimmed)) return trimmed
-  try {
-    const url = new URL(trimmed)
-    if (url.hostname.includes('youtu.be')) return url.pathname.slice(1)
-    if (url.searchParams.get('v')) return url.searchParams.get('v')
-    const shortsMatch = url.pathname.match(/\/shorts\/([\w-]{11})/)
-    if (shortsMatch) return shortsMatch[1]
-  } catch {
-    return null
-  }
-  return null
 }
 
 export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack }) => {

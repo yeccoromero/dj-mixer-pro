@@ -7,6 +7,7 @@ import { Timeline } from './Timeline'
 import { EffectsPanel } from './EffectsPanel'
 import heroImage from '@/assets/dj-mixer-hero.png'
 import type { EffectId } from '@/lib/effectSounds'
+import { computeCrossfaderVolumes } from '@/lib/mixerMath'
 
 export interface Track {
   id: string
@@ -84,8 +85,7 @@ export const DJMixer: React.FC = () => {
 
   // Cross-fader drives each deck's output volume.
   useEffect(() => {
-    const volumeA = Math.max(0, Math.min(100, 100 - crossFaderValue))
-    const volumeB = Math.max(0, Math.min(100, crossFaderValue))
+    const { volumeA, volumeB } = computeCrossfaderVolumes(crossFaderValue)
 
     setDeckA((prev) => (prev.volume === volumeA ? prev : { ...prev, volume: volumeA }))
     setDeckB((prev) => (prev.volume === volumeB ? prev : { ...prev, volume: volumeB }))

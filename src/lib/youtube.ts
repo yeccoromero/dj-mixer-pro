@@ -18,6 +18,7 @@ interface YouTubeNamespace {
       events?: {
         onReady?: (event: { target: YouTubePlayer }) => void
         onStateChange?: (event: { data: number; target: YouTubePlayer }) => void
+        onError?: (event: { data: number; target: YouTubePlayer }) => void
       }
     },
   ) => YouTubePlayer
@@ -28,6 +29,23 @@ declare global {
   interface Window {
     YT?: YouTubeNamespace
     onYouTubeIframeAPIReady?: () => void
+  }
+}
+
+/** Human-readable messages for the YouTube IFrame API's onError codes. */
+export function describeYouTubeError(code: number): string {
+  switch (code) {
+    case 2:
+      return 'ID de video inválido'
+    case 5:
+      return 'Este video no es compatible con el reproductor HTML5'
+    case 100:
+      return 'Video no encontrado o eliminado'
+    case 101:
+    case 150:
+      return 'El dueño del video bloqueó su reproducción fuera de YouTube'
+    default:
+      return 'No se pudo reproducir este video'
   }
 }
 
