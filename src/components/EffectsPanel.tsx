@@ -3,7 +3,6 @@ import { motion } from 'framer-motion'
 import { Siren, Megaphone, Zap, Radio } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { playEffect, type EffectId } from '@/lib/effectSounds'
-import { publishEvent } from '@/lib/sessionEvents'
 
 interface EffectsPanelProps {
   onEffectTrigger: (effect: EffectId) => void
@@ -22,7 +21,6 @@ export const EffectsPanel: React.FC<EffectsPanelProps> = ({ onEffectTrigger }) =
   const trigger = (effect: EffectId) => {
     playEffect(effect)
     onEffectTrigger(effect)
-    publishEvent(`Efecto activado: ${effect}`)
     setActiveEffect(effect)
     window.setTimeout(() => setActiveEffect((current) => (current === effect ? null : current)), 350)
   }

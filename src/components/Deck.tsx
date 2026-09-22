@@ -6,7 +6,6 @@ import { Knob } from './Knob'
 import { WavePanel } from './WavePanel'
 import { loadYouTubeApi, describeYouTubeError, type YouTubePlayer } from '@/lib/youtube'
 import { computeEffectiveVolume } from '@/lib/mixerMath'
-import { publishEvent } from '@/lib/sessionEvents'
 import { cn } from '@/lib/utils'
 
 interface DeckProps {
@@ -54,7 +53,6 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
           onError: (event) => {
             setError(describeYouTubeError(event.data))
             onStateChange((prev) => ({ ...prev, isPlaying: false }))
-            publishEvent(`Deck ${id} error: ${describeYouTubeError(event.data)}`)
           },
         },
       })
@@ -69,11 +67,15 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  // Load a new video when the assigned track changes.
+  // Load a new video when the assigned track changes, or stop playback if it was cleared.
   useEffect(() => {
-    if (ready && playerRef.current && state.track) {
+    if (!ready || !playerRef.current) return
+    if (state.track) {
       setError(null)
       playerRef.current.loadVideoById(state.track.youtubeId)
+    } else {
+      setError(null)
+      playerRef.current.pauseVideo()
     }
   }, [state.track?.youtubeId, ready])
 
@@ -102,10 +104,8 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
     if (!playerRef.current || !ready) return
     if (state.isPlaying) {
       playerRef.current.pauseVideo()
-      publishEvent(`Deck ${id} en pausa`)
     } else {
       playerRef.current.playVideo()
-      publishEvent(`Deck ${id} reproduciendo "${state.track?.title ?? 'sin pista'}"`)
     }
   }
 
@@ -113,7 +113,6 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
     if (!playerRef.current || !ready || !state.track) return
     const target = (state.cue / 100) * state.track.duration
     playerRef.current.seekTo(target, true)
-    publishEvent(`Deck ${id} salto a cue (${Math.round(target)}s)`)
   }
 
   const duration = state.track?.duration ?? 1
@@ -164,6 +163,7 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
         <button
           type="button"
           disabled={!ready}
+          title="Salta la reproducción al punto marcado por el knob 'Cue pt.'"
           onClick={(event) => {
             event.stopPropagation()
             jumpToCue()
@@ -194,18 +194,21 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
           value={state.gain}
           onChange={(v) => onStateChange((prev) => ({ ...prev, gain: v }))}
           accent={color}
+          description="Ganancia del deck: se combina con el crossfader para dar el volumen final"
         />
         <Knob
           label="Filter"
           value={state.filter}
           onChange={(v) => onStateChange((prev) => ({ ...prev, filter: v }))}
           accent={color}
+          description="Filtro visual (saturación del video); no afecta el audio del embed de YouTube"
         />
         <Knob
           label="Cue pt."
           value={state.cue}
           onChange={(v) => onStateChange((prev) => ({ ...prev, cue: v }))}
           accent={color}
+          description="Define a qué % de la pista salta el botón 'Cue'"
         />
       </div>
     </motion.div>

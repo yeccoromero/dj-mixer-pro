@@ -1,29 +1,63 @@
-import React, { useMemo, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { motion, type PanInfo } from 'framer-motion'
+import { ChevronLeft, ChevronRight, X, Clock } from 'lucide-react'
 import type { Track } from './DJMixer'
 import { AddTrackModal } from './AddTrackModal'
 import { cn } from '@/lib/utils'
-import { publishEvent } from '@/lib/sessionEvents'
 
 interface CoverFlowProps {
   tracks: Track[]
   selectedTrack: Track | null
+  activeDeck: 'A' | 'B'
   onTrackSelect: (track: Track) => void
   onAddTrack: (track: Track) => void
+  onRemoveTrack: (trackId: string) => void
 }
 
-export const CoverFlow: React.FC<CoverFlowProps> = ({ tracks, selectedTrack, onTrackSelect, onAddTrack }) => {
+const STACK_DEPTH = 3 // active card + up to 2 fanned behind it
+
+function formatDuration(totalSeconds: number) {
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = Math.floor(totalSeconds % 60)
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`
+}
+
+export const CoverFlow: React.FC<CoverFlowProps> = ({
+  tracks,
+  selectedTrack,
+  activeDeck,
+  onTrackSelect,
+  onAddTrack,
+  onRemoveTrack,
+}) => {
+  // The carousel's own position — the single source of truth for what's on top of the
+  // stack. Kept independent of `selectedTrack` so the arrows/swipe always work, even
+  // after a track has been loaded into a deck.
   const [centerIndex, setCenterIndex] = useState(0)
 
-  const activeIndex = useMemo(() => {
-    if (!selectedTrack) return centerIndex
+  // Keep the index valid as tracks are added/removed.
+  useEffect(() => {
+    setCenterIndex((i) => Math.min(Math.max(i, 0), Math.max(tracks.length - 1, 0)))
+  }, [tracks.length])
+
+  // When a track gets assigned to a deck from elsewhere, bring it to the front of the
+  // stack once — but this never fires again just from browsing with the arrows.
+  useEffect(() => {
+    if (!selectedTrack) return
     const idx = tracks.findIndex((t) => t.id === selectedTrack.id)
-    return idx === -1 ? centerIndex : idx
-  }, [selectedTrack, tracks, centerIndex])
+    if (idx !== -1) setCenterIndex(idx)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTrack])
 
   const move = (direction: -1 | 1) => {
     setCenterIndex((prev) => Math.min(tracks.length - 1, Math.max(0, prev + direction)))
+  }
+
+  const handleDragEnd = (_event: unknown, info: PanInfo) => {
+    const SWIPE_DISTANCE = 60
+    const SWIPE_VELOCITY = 400
+    if (info.offset.x < -SWIPE_DISTANCE || info.velocity.x < -SWIPE_VELOCITY) move(1)
+    else if (info.offset.x > SWIPE_DISTANCE || info.velocity.x > SWIPE_VELOCITY) move(-1)
   }
 
   if (tracks.length === 0) {
@@ -35,6 +69,8 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({ tracks, selectedTrack, onT
     )
   }
 
+  const visibleStack = tracks.slice(centerIndex, centerIndex + STACK_DEPTH)
+
   return (
     <div className="panel flex flex-col gap-4 p-5">
       <div className="flex items-center justify-between">
@@ -42,60 +78,102 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({ tracks, selectedTrack, onT
         <AddTrackModal onAddTrack={onAddTrack} />
       </div>
 
-      <div className="relative flex h-36 items-center justify-center overflow-visible">
+      <div className="relative flex h-64 items-center justify-center">
         <button
           type="button"
           onClick={() => move(-1)}
-          className="knob absolute left-0 z-20 flex h-8 w-8 items-center justify-center"
+          disabled={centerIndex === 0}
+          className="knob absolute left-0 z-30 flex h-8 w-8 items-center justify-center disabled:opacity-30"
           aria-label="Anterior"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
 
-        <div className="flex items-center justify-center gap-0">
-          <AnimatePresence initial={false}>
-            {tracks.map((track, index) => {
-              const offset = index - activeIndex
-              if (Math.abs(offset) > 2) return null
-              const isActive = offset === 0
+        <div className="relative h-56 w-44">
+          {visibleStack
+            .slice()
+            .reverse()
+            .map((track, reverseIndex) => {
+              const depth = visibleStack.length - 1 - reverseIndex // 0 = front/active card
+              const isActive = depth === 0
 
               return (
-                <motion.button
-                  type="button"
+                <motion.div
                   key={track.id}
-                  layout
-                  onClick={() => {
-                    setCenterIndex(index)
-                    onTrackSelect(track)
-                    publishEvent(`Pista seleccionada: "${track.title}"`)
-                  }}
-                  className={cn('coverflow-card relative -mx-3 shrink-0 overflow-hidden rounded-lg border-2 shadow', isActive ? 'active border-lime-accent' : 'side border-transparent')}
-                  initial={{ opacity: 0 }}
+                  className="coverflow-card absolute inset-0 overflow-hidden rounded-2xl border-2 border-white/50 bg-black shadow-lg"
+                  initial={false}
                   animate={{
-                    opacity: 1,
-                    scale: isActive ? 1.1 : 0.85 - Math.abs(offset) * 0.1,
-                    zIndex: isActive ? 10 : 5 - Math.abs(offset),
-                    rotateY: offset * -25,
+                    x: depth * 16,
+                    y: depth * 10,
+                    scale: 1 - depth * 0.07,
+                    rotate: depth * 3,
+                    opacity: 1 - depth * 0.3,
                   }}
-                  style={{ width: 96, height: 96 }}
+                  style={{ zIndex: 10 - depth, touchAction: 'pan-y' }}
                   transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+                  drag={isActive ? 'x' : false}
+                  dragConstraints={{ left: 0, right: 0 }}
+                  dragElastic={0.6}
+                  onDragEnd={isActive ? handleDragEnd : undefined}
                 >
-                  <img src={track.thumbnail} alt={track.title} className="h-full w-full object-cover" draggable={false} />
+                  <img
+                    src={track.thumbnail}
+                    alt={track.title}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    draggable={false}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
+
                   {isActive && (
-                    <div className="absolute inset-x-0 bottom-0 bg-black/60 px-1.5 py-1 text-left">
-                      <p className="truncate text-[10px] font-medium text-white">{track.title}</p>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onRemoveTrack(track.id)
+                      }}
+                      className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-black shadow hover:bg-white"
+                      aria-label={`Quitar "${track.title}" de la biblioteca`}
+                      title="Quitar de la biblioteca"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
                   )}
-                </motion.button>
+
+                  <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-white">{track.title}</p>
+                      <p className="flex items-center gap-1 truncate text-xs text-white/70">
+                        <Clock className="h-3 w-3 shrink-0" />
+                        {track.artist} · {formatDuration(track.duration)}
+                      </p>
+                    </div>
+                    {isActive && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          onTrackSelect(track)
+                        }}
+                        className={cn(
+                          'w-full rounded-full py-1.5 text-xs font-semibold text-black shadow',
+                          activeDeck === 'A' ? 'bg-lime-accent' : 'bg-aqua-accent',
+                        )}
+                        title={`Cargar esta pista en el Deck ${activeDeck} (el deck activo)`}
+                      >
+                        Cargar en Deck {activeDeck}
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
               )
             })}
-          </AnimatePresence>
         </div>
 
         <button
           type="button"
           onClick={() => move(1)}
-          className="knob absolute right-0 z-20 flex h-8 w-8 items-center justify-center"
+          disabled={centerIndex >= tracks.length - 1}
+          className="knob absolute right-0 z-30 flex h-8 w-8 items-center justify-center disabled:opacity-30"
           aria-label="Siguiente"
         >
           <ChevronRight className="h-4 w-4" />
@@ -103,7 +181,7 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({ tracks, selectedTrack, onT
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
-        {tracks[activeIndex]?.title} — {tracks[activeIndex]?.artist}
+        {centerIndex + 1} / {tracks.length}
       </p>
     </div>
   )

@@ -10,6 +10,8 @@ interface KnobProps {
   accent?: 'lime' | 'aqua' | 'none'
   min?: number
   max?: number
+  /** Longer explanation shown as a native tooltip on hover/focus. */
+  description?: string
 }
 
 const MIN_ANGLE = -135
@@ -23,6 +25,7 @@ export const Knob: React.FC<KnobProps> = ({
   accent = 'none',
   min = 0,
   max = 100,
+  description,
 }) => {
   const dragState = useRef<{ startY: number; startValue: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -69,6 +72,7 @@ export const Knob: React.FC<KnobProps> = ({
         aria-valuemin={min}
         aria-valuemax={max}
         aria-valuenow={value}
+        title={description}
         tabIndex={0}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}

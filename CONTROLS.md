@@ -3,10 +3,11 @@
 Este documento describe **cada control interactivo** de la aplicación: qué hace, a qué estado
 afecta, y cómo se conecta con el resto de componentes. Todo lo aquí descrito está validado por:
 
-- 61 tests automatizados (`npm run test`) — lógica pura, componentes con mocks del reproductor de
-  YouTube, drag del crossfader, teclado de los knobs, formulario de agregar pista, etc.
-- Una pasada de interacción real en navegador (Playwright) que ejercitó los 16 flujos descritos
-  abajo contra la app corriendo, sin errores de JavaScript.
+- Tests automatizados (`npm run test`) — lógica pura, componentes con mocks del reproductor de
+  YouTube, drag del crossfader, teclado de los knobs, swipe/borrado de la biblioteca, formulario
+  de agregar pista, etc.
+- Una pasada de interacción real en navegador (Playwright) que ejercitó los flujos descritos abajo
+  contra la app corriendo, sin errores de JavaScript.
 
 ## Flujo de datos general
 
@@ -25,23 +26,19 @@ afecta, y cómo se conecta con el resto de componentes. Todo lo aquí descrito e
         └───────────┘      │    tsx)      │      └───────────┘
                             └─────────────┘
                                    │
-                    ┌──────────────┼──────────────┐
-                    │              │              │
-             ┌─────────────┐ ┌──────────┐  ┌────────────┐
-             │  CoverFlow  │ │ Timeline │  │EffectsPanel│
-             │(+AddTrack   │ │          │  │            │
-             │   Modal)    │ │          │  │            │
-             └─────────────┘ └──────────┘  └────────────┘
+                    ┌──────────────┴──────────────┐
+                    │                              │
+             ┌─────────────┐               ┌────────────┐
+             │  CoverFlow  │               │EffectsPanel│
+             │(+AddTrack   │               │            │
+             │   Modal)    │               │            │
+             └─────────────┘               └────────────┘
 ```
 
 `DJMixer.tsx` es el único componente con estado "real". Todo lo demás recibe props hacia abajo y
-notifica hacia arriba con callbacks (`onChange`, `onTrackSelect`, `onStateChange`, etc.) — patrón
-estándar de React de estado elevado ("lifted state").
-
-El pegamento entre controles que **no** viven en el mismo árbol de props es
-`src/lib/sessionEvents.ts`: un pequeño *pub/sub* en memoria. Cualquier control puede llamar
-`publishEvent("texto")` y el `Timeline` (que se suscribe con `useSessionEvents()`) lo muestra al
-instante, sin que `DJMixer` tenga que enrutar esa información.
+notifica hacia arriba con callbacks (`onChange`, `onTrackSelect`, `onRemoveTrack`, `onStateChange`,
+etc.) — patrón estándar de React de estado elevado ("lifted state"). No hay ningún canal de eventos
+global entre componentes: toda la comunicación pasa por `DJMixer.tsx`.
 
 ---
 
@@ -55,16 +52,15 @@ instante, sin que `DJMixer` tenga que enrutar esa información.
 
 ## Panel de efectos (`EffectsPanel.tsx`)
 
-| Botón | Qué hace al hacer clic | Con qué se conecta |
-|---|---|---|
-| **Siren** | Sintetiza un sonido de sirena (barrido de frecuencia) vía Web Audio API (`lib/effectSounds.ts`), llama a `onEffectTrigger('siren')` (log), y publica el evento `Efecto activado: siren` | `Timeline` (vía `sessionEvents`) |
-| **Airhorn** | Sintetiza un sonido de bocina (onda sawtooth grave) | igual que arriba, con `'airhorn'` |
-| **Laser** | Sintetiza un barrido agudo→grave corto (onda cuadrada) | igual que arriba, con `'laser'` |
-| **Radio** | Sintetiza ruido filtrado en banda (simula estática de radio) | igual que arriba, con `'radio'` |
+| Botón | Qué hace al hacer clic |
+|---|---|
+| **Siren** | Sintetiza un sonido de sirena (barrido de frecuencia) vía Web Audio API (`lib/effectSounds.ts`) y llama a `onEffectTrigger('siren')` |
+| **Airhorn** | Sintetiza un sonido de bocina (onda sawtooth grave) |
+| **Laser** | Sintetiza un barrido agudo→grave corto (onda cuadrada) |
+| **Radio** | Sintetiza ruido filtrado en banda (simula estática de radio) |
 
-Los 4 botones comparten la misma lógica (`trigger(effect)`): reproducen el sonido, notifican al
-padre, publican el evento y aplican una animación de "flash" de 350ms en el propio botón. No
-dependen de ningún estado global — son autocontenidos.
+Los 4 botones comparten la misma lógica (`trigger(effect)`): reproducen el sonido y aplican una
+animación de "flash" de 350ms en el propio botón. Son autocontenidos, no dependen de estado global.
 
 ---
 
@@ -74,21 +70,34 @@ Cada deck es dueño de **un reproductor de YouTube** (vía la IFrame API, `lib/y
 
 | Control | Qué hace | Estado que toca | Notas |
 |---|---|---|---|
-| **Cuerpo del deck** (clic en cualquier parte no interactiva) | Marca este deck como el "activo" | `DJMixer.activeDeck` | Determina a qué deck se asigna la próxima pista seleccionada en `CoverFlow` |
-| **Botón ▶/⏸ (Play/Pause)** | Reproduce o pausa el video de YouTube (`player.playVideo()` / `player.pauseVideo()`) | `DeckState.isPlaying` (lo actualiza el propio evento `onStateChange` del reproductor, no el clic directamente) | Deshabilitado hasta que el reproductor emite `onReady`; también publica un evento en el Timeline |
-| **Botón CUE** | Salta la reproducción al punto de cue (`player.seekTo(...)`) | Lee `DeckState.cue` (0–100%) y `track.duration` para calcular el segundo exacto | Deshabilitado hasta `onReady` y si no hay pista asignada |
-| **Knob GAIN** | Arrastre vertical (o flechas ↑/↓ con teclado) ajusta la ganancia del deck, 0–100 | `DeckState.gain` | Se combina con el volumen del crossfader (`computeEffectiveVolume`) y se envía como `player.setVolume(...)` |
-| **Knob FILTER** | Igual interacción que Gain | `DeckState.filter` | Aplica un filtro CSS `saturate()` en vivo sobre el video — efecto visual, no de audio (el audio del embed de YouTube no es interceptable) |
-| **Knob CUE PT.** | Igual interacción | `DeckState.cue` | Define el % del track al que salta el botón CUE |
+| **Cuerpo del deck** (clic en cualquier parte no interactiva) | Marca este deck como el "activo" | `DJMixer.activeDeck` | Determina a qué deck carga la próxima pista con el botón "Cargar en Deck" de `CoverFlow` |
+| **Botón ▶/⏸ (Play/Pause)** | Reproduce o pausa el video de YouTube (`player.playVideo()` / `player.pauseVideo()`) | `DeckState.isPlaying` (lo actualiza el propio evento `onStateChange` del reproductor, no el clic directamente) | Deshabilitado hasta que el reproductor emite `onReady` |
+| **Botón CUE** *(tooltip: "Salta la reproducción al punto marcado por 'Cue pt.'")* | Salta la reproducción al punto de cue (`player.seekTo(...)`) | Lee `DeckState.cue` (0–100%) y `track.duration` para calcular el segundo exacto | Deshabilitado hasta `onReady` y si no hay pista asignada |
+| **Knob GAIN** *(tooltip: "Ganancia del deck: se combina con el crossfader")* | Arrastre vertical (o flechas ↑/↓ con teclado) ajusta la ganancia del deck, 0–100 | `DeckState.gain` | Se combina con el volumen del crossfader (`computeEffectiveVolume`) y se envía como `player.setVolume(...)` |
+| **Knob FILTER** *(tooltip aclara que es solo visual)* | Igual interacción que Gain | `DeckState.filter` | Aplica un filtro CSS `saturate()` en vivo sobre el video — efecto visual, no de audio (el audio del embed de YouTube no es interceptable) |
+| **Knob CUE PT.** *(tooltip: "Define a qué % de la pista salta el botón 'Cue'")* | Igual interacción | `DeckState.cue` | Define el % del track al que salta el botón CUE |
 
-**Conexión con el crossfader:** el volumen que cada deck realmente aplica al reproductor no es
-solo el gain — es `computeEffectiveVolume(volumen_por_crossfader, gain)` (ver
-`lib/mixerMath.ts`), o sea `(volumen/100) × (gain/100) × 100`. Así, mover el crossfader hacia un
-lado **y** subir el gain de ese deck se combinan multiplicativamente, como en un mixer real.
+**¿Qué son Gain y Cue, en criollo?**
+- **Gain** = qué tan fuerte suena ese deck. Se multiplica con la posición del crossfader: si el
+  crossfader está del lado del otro deck, aunque subas el Gain al máximo no vas a escuchar nada.
+- **Cue** = un marcador de posición dentro de la pista. El knob "Cue pt." define el %; el botón
+  "Cue" salta ahí instantáneamente (útil para volver siempre al mismo punto, como el "drop" de un
+  tema).
+
+**Conexión con el crossfader:** el volumen que cada deck realmente aplica al reproductor es
+`computeEffectiveVolume(volumen_por_crossfader, gain)` (ver `lib/mixerMath.ts`), o sea
+`(volumen/100) × (gain/100) × 100`. Mover el crossfader hacia un lado **y** subir el gain de ese
+deck se combinan multiplicativamente, como en un mixer real.
+
+**Pista removida de la biblioteca:** si borras desde `CoverFlow` la pista que un deck tiene
+cargada, ese deck limpia su `track` (vuelve a "Sin pista asignada") y pausa la reproducción.
 
 **Manejo de errores:** si YouTube reporta que un video no se puede reproducir ahí (embedding
 bloqueado por el dueño — códigos 101/150 — video eliminado, ID inválido, etc.), el deck muestra un
 mensaje claro en pantalla (`lib/youtube.ts#describeYouTubeError`) en vez de quedarse en silencio.
+Esto **no se puede evitar desde la app** — es una restricción que pone el dueño del video en
+YouTube (frecuente con sellos discográficos como UMPG); la solución es borrar esa pista de la
+biblioteca y buscar otra versión/fuente.
 
 ---
 
@@ -106,19 +115,26 @@ su propio Gain (ver arriba) antes de aplicarlo al reproductor real.
 
 ---
 
-## CoverFlow (`CoverFlow.tsx`)
+## CoverFlow — biblioteca en stack de tarjetas (`CoverFlow.tsx`)
+
+Rediseñada como un mazo de tarjetas apiladas (carátula a pantalla completa, tarjeta activa
+arrastrable), en vez del carrusel plano anterior.
 
 | Control | Qué hace | Estado que toca |
 |---|---|---|
-| **‹ Anterior** | Retrocede el índice de la pista resaltada (sin pasar de la primera) | estado local `centerIndex` |
-| **› Siguiente** | Avanza el índice (sin pasar de la última) | estado local `centerIndex` |
-| **Clic en una miniatura** | Selecciona esa pista y **se la asigna al deck actualmente activo** (`DJMixer.activeDeck`) | `DJMixer.selectedTrack`, `deckA.track` o `deckB.track` (según cuál esté activo) |
+| **‹ Anterior / › Siguiente** | Mueve la tarjeta activa del stack (se deshabilitan en los extremos) | estado local `centerIndex` — **independiente** de qué pista esté cargada en un deck, para que siempre respondan |
+| **Arrastrar la tarjeta activa** | Igual que Siguiente/Anterior pero con swipe (izquierda = siguiente, derecha = anterior); si el arrastre no supera el umbral, la tarjeta vuelve a su lugar | `centerIndex` |
+| **Botón ✕ (esquina superior de la tarjeta)** | Quita esa pista de la biblioteca permanentemente | `DJMixer.tracks` (vía `onRemoveTrack`), y limpia el deck que la tuviera cargada |
+| **Botón "Cargar en Deck A/B"** (el texto cambia según cuál deck esté activo) | Asigna la tarjeta de arriba del stack al deck activo | `DJMixer.selectedTrack`, `deckA.track` o `deckB.track` |
 | **Botón "Agregar pista"** | Abre el modal `AddTrackModal` | — |
 
-Este es el punto de conexión clave entre "elegir música" y "qué suena": seleccionar una miniatura
-no reproduce nada por sí solo — solo carga esa pista en el deck activo (`Deck` reacciona a que
-`state.track` cambió y llama `player.loadVideoById(...)`); hay que pulsar Play en el deck para
-escucharla.
+**Antes vs. ahora:** en la versión anterior, tocar cualquier miniatura la seleccionaba y cargaba de
+inmediato — y una vez seleccionada, las flechas dejaban de mover el stack (bug ya corregido). Ahora
+navegar el stack (flechas/swipe) y cargar una pista en el deck son dos acciones explícitas y
+separadas, así siempre podés "hojear" la biblioteca sin disparar una carga accidental.
+
+**Duración visible:** cada tarjeta muestra `artista · duración (m:ss)` para identificar la pista
+sin tener que cargarla.
 
 ### Modal "Agregar pista" (`AddTrackModal.tsx`)
 
@@ -129,18 +145,9 @@ escucharla.
 | **Botón "Añadir a la biblioteca"** | Valida el link; si es inválido muestra un error inline; si es válido, construye un `Track` y llama `onAddTrack(track)`, cierra el modal y limpia el formulario |
 
 **Conexión:** `onAddTrack` sube hasta `DJMixer.handleAddTrack`, que agrega la pista al array
-`tracks` **y** lo persiste en `localStorage` (clave `dj-mixer-tracks`) — por eso la biblioteca
-sobrevive a un refresh de página.
-
----
-
-## Timeline (`Timeline.tsx`)
-
-No tiene controles de entrada — es puramente un **panel de salida**. Se suscribe a
-`sessionEvents` (`useSessionEvents()`) y muestra, en orden cronológico inverso, cada evento que
-cualquier otro control publicó: play/pausa/cue de cada deck, movimientos del crossfader, efectos
-activados, selección de pistas, y errores de reproducción. También muestra un reloj en vivo
-(actualizado cada segundo) independiente de esos eventos.
+`tracks` **y** lo persiste en `localStorage` (clave `dj-mixer-tracks`). `onRemoveTrack` hace lo
+mismo mecanismo a la inversa (filtra el array y vuelve a guardar) — por eso la biblioteca sobrevive
+a un refresh de página, altas y bajas incluidas.
 
 ---
 
@@ -153,8 +160,9 @@ activados, selección de pistas, y errores de reproducción. También muestra un
 | Knobs (Gain/Filter/Cue pt.) | ✅ teclado + clamps | ✅ |
 | Crossfader (drag + Centrar) | ✅ | ✅ |
 | Activar deck (A/B) | — | ✅ |
-| CoverFlow (‹ › + selección) | ✅ | ✅ |
+| CoverFlow (‹ › + swipe, sin bloquearse tras seleccionar) | ✅ | ✅ |
+| CoverFlow — quitar pista de la biblioteca | ✅ | — |
+| CoverFlow — "Cargar en Deck X" | ✅ | ✅ |
 | Agregar pista (válida/ inválida) | ✅ | ✅ |
-| Efectos (Siren/Airhorn/Laser/Radio) | ✅ | ✅ (se ven en el Timeline) |
-| Timeline (eventos + reloj) | ✅ (pub/sub) | ✅ |
+| Efectos (Siren/Airhorn/Laser/Radio) | ✅ | ✅ |
 | Manejo de error de YouTube (101/150/etc.) | ✅ | — (requiere red real hacia YouTube) |

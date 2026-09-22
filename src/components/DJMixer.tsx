@@ -3,7 +3,6 @@ import { motion } from 'framer-motion'
 import { Deck } from './Deck'
 import { CrossFader } from './CrossFader'
 import { CoverFlow } from './CoverFlow'
-import { Timeline } from './Timeline'
 import { EffectsPanel } from './EffectsPanel'
 import heroImage from '@/assets/dj-mixer-hero.png'
 import type { EffectId } from '@/lib/effectSounds'
@@ -108,6 +107,17 @@ export const DJMixer: React.FC = () => {
     })
   }
 
+  const handleRemoveTrack = (trackId: string) => {
+    setTracks((prev) => {
+      const updatedTracks = prev.filter((t) => t.id !== trackId)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedTracks))
+      return updatedTracks
+    })
+    setSelectedTrack((prev) => (prev?.id === trackId ? null : prev))
+    setDeckA((prev) => (prev.track?.id === trackId ? { ...prev, track: null, isPlaying: false, currentTime: 0 } : prev))
+    setDeckB((prev) => (prev.track?.id === trackId ? { ...prev, track: null, isPlaying: false, currentTime: 0 } : prev))
+  }
+
   const handleEffectTrigger = (effect: EffectId) => {
     console.log(`Activando efecto: ${effect}`)
   }
@@ -145,9 +155,14 @@ export const DJMixer: React.FC = () => {
         <div className="space-y-6">
           <CrossFader value={crossFaderValue} onChange={setCrossFaderValue} />
 
-          <CoverFlow tracks={tracks} selectedTrack={selectedTrack} onTrackSelect={handleTrackSelect} onAddTrack={handleAddTrack} />
-
-          <Timeline />
+          <CoverFlow
+            tracks={tracks}
+            selectedTrack={selectedTrack}
+            activeDeck={activeDeck}
+            onTrackSelect={handleTrackSelect}
+            onAddTrack={handleAddTrack}
+            onRemoveTrack={handleRemoveTrack}
+          />
         </div>
 
         {/* Deck B */}

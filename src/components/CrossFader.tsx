@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef } from 'react'
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
-import { publishEvent } from '@/lib/sessionEvents'
 
 interface CrossFaderProps {
   value: number // 0 (full A) - 100 (full B)
@@ -10,7 +9,6 @@ interface CrossFaderProps {
 export const CrossFader: React.FC<CrossFaderProps> = ({ value, onChange }) => {
   const trackRef = useRef<HTMLDivElement>(null)
   const x = useMotionValue(value)
-  const lastPublished = useRef(value)
   const isDragging = useRef(false)
 
   useEffect(() => {
@@ -46,16 +44,10 @@ export const CrossFader: React.FC<CrossFaderProps> = ({ value, onChange }) => {
 
   const handlePointerUp = () => {
     isDragging.current = false
-    if (Math.abs(lastPublished.current - x.get()) > 5) {
-      const side = x.get() < 50 ? 'A' : x.get() > 50 ? 'B' : 'centro'
-      publishEvent(`Crossfader movido hacia ${side}`)
-      lastPublished.current = x.get()
-    }
   }
 
   const snapCenter = () => {
     animate(x, 50, { type: 'spring', stiffness: 300, damping: 25, onUpdate: (v) => onChange(Math.round(v)) })
-    publishEvent('Crossfader centrado')
   }
 
   return (
