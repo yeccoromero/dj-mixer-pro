@@ -26,6 +26,7 @@ npm install
 npm run dev      # servidor de desarrollo
 npm run build    # build de producción (tsc -b && vite build)
 npm run lint      # oxlint
+npm run test      # vitest (61 tests: lógica pura + componentes)
 ```
 
 ## Estructura
@@ -47,6 +48,11 @@ src/
 ├── pages/Index.tsx       # Página principal
 └── index.css             # Sistema de diseño Music OS
 ```
+
+## Controles
+
+Cada botón, knob y control interactivo está documentado en detalle — qué hace, qué estado toca y
+cómo se conecta con el resto de la app — en **[CONTROLS.md](./CONTROLS.md)**.
 
 ## Notas
 
