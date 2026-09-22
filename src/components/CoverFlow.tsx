@@ -3,6 +3,7 @@ import { motion, AnimatePresence, type PanInfo } from 'framer-motion'
 import { ChevronLeft, ChevronRight, X, Clock } from 'lucide-react'
 import type { Track } from './DJMixer'
 import { AddTrackModal } from './AddTrackModal'
+import { formatTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 interface CoverFlowProps {
@@ -22,12 +23,6 @@ const STEP_X = 84 // horizontal distance each side card slides per position
 // fluid for discrete navigation than a spring, which tends to wobble/overshoot when it's
 // animating position, scale and 3D rotation all at once.
 const EASE_OUT_EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1]
-
-function formatDuration(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = Math.floor(totalSeconds % 60)
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`
-}
 
 export const CoverFlow: React.FC<CoverFlowProps> = ({
   tracks,
@@ -157,7 +152,7 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({
                       {isActive && (
                         <p className="flex items-center gap-1 truncate text-[10px] text-white/70">
                           <Clock className="h-2.5 w-2.5 shrink-0" />
-                          {track.artist} · {formatDuration(track.duration)}
+                          {track.artist} · {formatTime(track.duration)}
                         </p>
                       )}
                     </div>

@@ -6,6 +6,8 @@ import { Knob } from './Knob'
 import { WavePanel } from './WavePanel'
 import { loadYouTubeApi, describeYouTubeError, type YouTubePlayer } from '@/lib/youtube'
 import { computeEffectiveVolume } from '@/lib/mixerMath'
+import { registerTap } from '@/lib/bpm'
+import { formatTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 interface DeckProps {
@@ -27,6 +29,8 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
   const [error, setError] = useState<string | null>(null)
   const pollRef = useRef<number | null>(null)
   const lastReportedDuration = useRef<{ trackId: string; duration: number } | null>(null)
+  const tapHistoryRef = useRef<number[]>([])
+  const [bpm, setBpm] = useState<number | null>(null)
 
   // The player's event handlers below are attached once (see the `[id]`-only effect) and
   // would otherwise close over a stale `state` forever, so they read from this ref instead.
@@ -103,6 +107,18 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
     }
   }, [state.track?.youtubeId, ready])
 
+  // A new track means the previous tap-tempo reading no longer applies.
+  useEffect(() => {
+    tapHistoryRef.current = []
+    setBpm(null)
+  }, [state.track?.id])
+
+  const handleTap = () => {
+    const { history, bpm: nextBpm } = registerTap(tapHistoryRef.current, Date.now())
+    tapHistoryRef.current = history
+    setBpm(nextBpm)
+  }
+
   // Crossfader volume combined with the gain knob.
   useEffect(() => {
     if (ready && playerRef.current) {
@@ -142,6 +158,8 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
   const duration = state.track?.duration ?? 1
   const progress = duration > 0 ? state.currentTime / duration : 0
   const color = accent[id]
+  const ledClass = id === 'A' ? 'led-display-lime' : 'led-display-aqua'
+  const beatPulseColor = id === 'A' ? 'rgba(215,255,67,0.6)' : 'rgba(0,238,196,0.6)'
 
   return (
     <motion.div
@@ -183,6 +201,15 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
 
       <WavePanel seed={state.track?.id ?? id} progress={progress} isPlaying={state.isPlaying} accent={color} />
 
+      <div className="flex items-center justify-between px-0.5" onClick={(event) => event.stopPropagation()}>
+        <span className={cn(ledClass, 'text-xs')} title="Tiempo transcurrido">
+          {formatTime(state.currentTime)}
+        </span>
+        <span className={cn(ledClass, 'text-xs')} title="Tiempo restante">
+          -{formatTime(Math.max(0, duration - state.currentTime))}
+        </span>
+      </div>
+
       <div className="flex items-center justify-center gap-3">
         <button
           type="button"
@@ -206,10 +233,31 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
           className={cn(
             'flex h-14 w-14 items-center justify-center rounded-full text-black shadow disabled:cursor-not-allowed disabled:opacity-40',
             id === 'A' ? 'bg-lime-accent' : 'bg-aqua-accent',
+            state.isPlaying && bpm && 'animate-beat-pulse',
           )}
+          style={
+            state.isPlaying && bpm
+              ? ({ animationDuration: `${60 / bpm}s`, '--beat-pulse-color': beatPulseColor } as React.CSSProperties)
+              : undefined
+          }
+          title={bpm ? `Reproduciendo — pulso visual a ${bpm} BPM` : 'Reproducir/Pausar'}
         >
           {state.isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6 translate-x-0.5" />}
         </button>
+      </div>
+
+      <div className="flex items-center justify-center gap-2" onClick={(event) => event.stopPropagation()}>
+        <button
+          type="button"
+          onClick={handleTap}
+          title="Pulsar este botón al ritmo de la pista, varias veces seguidas, para estimar su BPM"
+          className="knob px-3 py-1.5 text-[10px] font-semibold uppercase"
+        >
+          Tap
+        </button>
+        <span className={cn(ledClass, 'min-w-[76px] text-xs')} title="BPM estimado por tap-tempo">
+          {bpm ? `${bpm} BPM` : '-- BPM'}
+        </span>
       </div>
 
       <div className="flex items-center justify-around pt-1" onClick={(event) => event.stopPropagation()}>

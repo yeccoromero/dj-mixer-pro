@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=DotGothic16&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -59,6 +59,10 @@
   .font-space-grotesk {
     font-family: 'Space Grotesk', monospace;
   }
+
+  .font-led {
+    font-family: 'DotGothic16', 'Space Grotesk', monospace;
+  }
 }
 
 @layer components {
@@ -100,6 +104,23 @@
      300ms transition, compounding into visibly slow, laggy motion. */
   .coverflow-card {
     @apply transform-gpu;
+  }
+
+  /* Dot-matrix LED readout (BPM, track counter) — dark inset panel with a glowing
+     pixel-font digit, evoking a hardware DJ display rather than flat UI text. */
+  .led-display {
+    @apply font-led rounded-md bg-black px-2 py-1 text-center tabular-nums;
+    letter-spacing: 0.1em;
+  }
+
+  .led-display-lime {
+    @apply led-display text-lime-accent;
+    text-shadow: 0 0 6px hsl(var(--lime-accent) / 0.85);
+  }
+
+  .led-display-aqua {
+    @apply led-display text-aqua-accent;
+    text-shadow: 0 0 6px hsl(var(--aqua-accent) / 0.85);
   }
 }
 

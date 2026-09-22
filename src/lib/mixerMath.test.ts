@@ -24,8 +24,10 @@ describe('computeCrossfaderVolumes', () => {
     expect(computeCrossfaderVolumes(100)).toEqual({ volumeA: 0, volumeB: 100 })
   })
 
-  it('splits volume evenly at the center', () => {
-    expect(computeCrossfaderVolumes(50)).toEqual({ volumeA: 50, volumeB: 50 })
+  it('uses an equal-power curve, so both decks sit above the midpoint at the center', () => {
+    // A linear crossfade would give 50/50 here, which is audibly quieter than either
+    // deck alone; equal-power keeps perceived loudness constant across the sweep.
+    expect(computeCrossfaderVolumes(50)).toEqual({ volumeA: 71, volumeB: 71 })
   })
 
   it('clamps out-of-range input', () => {

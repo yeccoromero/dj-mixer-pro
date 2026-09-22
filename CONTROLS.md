@@ -73,6 +73,8 @@ Cada deck es dueño de **un reproductor de YouTube** (vía la IFrame API, `lib/y
 | **Cuerpo del deck** (clic en cualquier parte no interactiva) | Marca este deck como el "activo" | `DJMixer.activeDeck` | Determina a qué deck carga la próxima pista con el botón "Cargar en Deck" de `CoverFlow` |
 | **Botón ▶/⏸ (Play/Pause)** | Reproduce o pausa el video de YouTube (`player.playVideo()` / `player.pauseVideo()`) | `DeckState.isPlaying` (lo actualiza el propio evento `onStateChange` del reproductor, no el clic directamente) | Deshabilitado hasta que el reproductor emite `onReady` |
 | **Botón CUE** *(tooltip: "Salta la reproducción al punto marcado por 'Cue pt.'")* | Salta la reproducción al punto de cue (`player.seekTo(...)`) | Lee `DeckState.cue` (0–100%) y `track.duration` para calcular el segundo exacto | Deshabilitado hasta `onReady` y si no hay pista asignada |
+| **Contador LED (transcurrido / restante)** | Muestra `tiempo transcurrido` y `-tiempo restante` en vivo, en la tipografía de puntos (`lib/format.ts#formatTime`) | Lee `DeckState.currentTime` y `track.duration` | Puramente informativo, no interactivo |
+| **Botón TAP + lectura BPM** *(tooltip explica el gesto)* | Cada clic registra una marca de tiempo; con 2 o más marcas cercanas entre sí, calcula el BPM promedio (`lib/bpm.ts#registerTap`) | Estado local del deck (`bpm`), no viaja a `DJMixer` | Un silencio de más de 2s entre toques reinicia la lectura; cambiar de pista también la reinicia. Mientras el BPM está definido y la pista suena, el botón Play emite un pulso visual (anillo) sincronizado a ese tempo — ayuda a mezclar a oído sin depender de ningún audio real, ya que YouTube no expone su señal para análisis |
 | **Knob GAIN** *(tooltip: "Ganancia del deck: se combina con el crossfader")* | Se arrastra el disco completo (gira de verdad, con inercia — un giro rápido sigue girando hasta frenar) o se usan las flechas ↑/↓ del teclado | `DeckState.gain` | Se combina con el volumen del crossfader (`computeEffectiveVolume`) y se envía como `player.setVolume(...)` |
 | **Knob FILTER** *(tooltip aclara que es solo visual)* | Igual interacción que Gain | `DeckState.filter` | Aplica un filtro CSS `saturate()` en vivo sobre el video — efecto visual, no de audio (el audio del embed de YouTube no es interceptable) |
 | **Knob CUE PT.** *(tooltip: "Define a qué % de la pista salta el botón 'Cue'")* | Igual interacción | `DeckState.cue` | Define el % del track al que salta el botón CUE |
@@ -122,6 +124,12 @@ entre sí.
 `computeCrossfaderVolumes(valor)` → `{ volumeA, volumeB }` (0 = A a full volumen, 100 = B a full
 volumen). Esos valores se guardan en `deckA.volume` / `deckB.volume`, que cada `Deck` combina con
 su propio Gain (ver arriba) antes de aplicarlo al reproductor real.
+
+**Curva de potencia constante (equal-power):** `computeCrossfaderVolumes` ya no reparte el volumen
+de forma lineal (50/50 en el centro); usa un barrido de un cuarto de coseno/seno, así que en el
+centro ambos decks quedan cerca de 71/71 en vez de 50/50. Es el mismo motivo por el que los mixers
+de DJ reales usan esta curva: una mezcla lineal suena perceptiblemente más floja justo a mitad de
+camino, porque la potencia percibida no es la suma lineal de los dos volúmenes.
 
 ---
 
@@ -198,3 +206,16 @@ altas, bajas y correcciones de duración incluidas.
 | Corrección de duración real desde el reproductor | ✅ | — (requiere red real hacia YouTube) |
 | Efectos (Siren/Airhorn/Laser/Radio) | ✅ | ✅ |
 | Manejo de error de YouTube (101/150/etc.) | ✅ | — (requiere red real hacia YouTube) |
+| Tap-tempo BPM (registro, reinicio por pista/silencio) | ✅ (`bpm.test.ts`, `Deck.test.tsx`) | ✅ |
+| Crossfader con curva de potencia constante | ✅ (`mixerMath.test.ts`) | ✅ |
+| Contador LED de tiempo transcurrido/restante | ✅ (`format.test.ts`) | ✅ |
+
+---
+
+## Tipografía LED (BPM y contadores)
+
+Los valores numéricos "en vivo" (BPM, tiempo transcurrido/restante) usan una fuente de matriz de
+puntos (`DotGothic16`, clase `.font-led` en `index.css`) sobre un panel negro con resplandor de
+color (`.led-display-lime` / `.led-display-aqua`), inspirados en las pantallas LED de un mixer de
+hardware real. El resto de la interfaz sigue usando Inter/Space Grotesk — la fuente de puntos se
+reserva a propósito para lecturas tipo "display", no para texto general.

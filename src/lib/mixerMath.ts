@@ -4,12 +4,19 @@ export function clamp100(value: number): number {
 }
 
 /**
- * Converts a crossfader position (0 = full deck A, 100 = full deck B) into
- * each deck's output volume.
+ * Converts a crossfader position (0 = full deck A, 100 = full deck B) into each deck's
+ * output volume, using an equal-power (constant-power) curve: volumeA/volumeB follow a
+ * quarter cosine/sine sweep instead of a straight line. A linear crossfade makes the
+ * mix noticeably quieter around the center (both decks near 50%, well below the ~70%
+ * each side hits alone), which is why real DJ mixers use this curve instead.
  */
 export function computeCrossfaderVolumes(crossFaderValue: number): { volumeA: number; volumeB: number } {
   const value = clamp100(crossFaderValue)
-  return { volumeA: clamp100(100 - value), volumeB: clamp100(value) }
+  const angle = (value / 100) * (Math.PI / 2)
+  return {
+    volumeA: clamp100(Math.round(Math.cos(angle) * 100)),
+    volumeB: clamp100(Math.round(Math.sin(angle) * 100)),
+  }
 }
 
 /**
