@@ -59,7 +59,17 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
       if (cancelled) return
       const player = new YT.Player(containerId, {
         videoId: state.track?.youtubeId ?? '',
-        playerVars: { controls: 0, modestbranding: 1, rel: 0, playsinline: 1 },
+        playerVars: {
+          controls: 0, // no native YouTube control bar — Play/Pause/Cue only from our own console
+          disablekb: 1, // no keyboard shortcuts on the embed (space, arrows, etc.)
+          fs: 0, // no fullscreen button
+          iv_load_policy: 3, // no video annotations
+          cc_load_policy: 0, // no captions/subtitles shown by default
+          modestbranding: 1,
+          rel: 0,
+          playsinline: 1,
+          origin: window.location.origin,
+        },
         events: {
           onReady: (event) => {
             playerRef.current = event.target
@@ -181,6 +191,10 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
 
       <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black/80">
         <div id={containerId} className="h-full w-full" style={{ filter: `saturate(${0.5 + state.filter / 100})` }} />
+        {/* Absorbs clicks/drags on the video itself so it stays a clean, passive display —
+            play/pause/seek only happen through our own controls below, never by interacting
+            with the embedded player directly (no native YouTube overlay, no accidental pause). */}
+        <div className="absolute inset-0" aria-hidden="true" />
         {!ready && !error && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-xs text-white/70">
             Cargando reproductor…

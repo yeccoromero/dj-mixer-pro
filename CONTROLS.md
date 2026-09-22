@@ -68,6 +68,16 @@ animación de "flash" de 350ms en el propio botón. Son autocontenidos, no depen
 
 Cada deck es dueño de **un reproductor de YouTube** (vía la IFrame API, `lib/youtube.ts`) y expone:
 
+**Reproductor "limpio", control exclusivo desde la consola:** el embed se crea con
+`controls: 0` (sin la barra nativa de YouTube), `disablekb: 1` (sin atajos de teclado propios),
+`fs: 0` (sin botón de pantalla completa), `iv_load_policy: 3` (sin anotaciones) y
+`cc_load_policy: 0` (sin subtítulos por defecto) — solo se ve el video, sin ninguna interfaz de
+YouTube encima. Además, un div transparente cubre todo el reproductor y absorbe cualquier clic o
+arrastre sobre el video (sin `onClick`, así que no hace nada): esto evita que tocar el video
+directamente lo pause/reproduzca por su cuenta, saltándose el estado de la app — play/pause/cue
+solo pasan por los botones de este panel, que son los que llaman a `player.playVideo()` /
+`pauseVideo()` / `seekTo()` explícitamente.
+
 | Control | Qué hace | Estado que toca | Notas |
 |---|---|---|---|
 | **Cuerpo del deck** (clic en cualquier parte no interactiva) | Marca este deck como el "activo" | `DJMixer.activeDeck` | Determina a qué deck carga la próxima pista con el botón "Cargar en Deck" de `CoverFlow` |
