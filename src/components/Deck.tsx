@@ -296,9 +296,9 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
         )}
       </div>
 
-      <div className="min-h-[40px]">
-        <p className="music-body truncate">{state.track?.title ?? 'Sin pista asignada'}</p>
-        <p className="truncate text-sm text-muted-foreground">{state.track?.artist ?? '—'}</p>
+      <div className="min-h-[32px]">
+        <p className="truncate text-sm font-medium">{state.track?.title ?? 'Sin pista asignada'}</p>
+        <p className="truncate text-xs text-muted-foreground">{state.track?.artist ?? '—'}</p>
       </div>
 
       <WavePanel
