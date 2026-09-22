@@ -37,6 +37,7 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
   const pollRef = useRef<number | null>(null)
   const lastReportedDuration = useRef<{ trackId: string; duration: number } | null>(null)
   const [justMarked, setJustMarked] = useState(false)
+  const [loadedFraction, setLoadedFraction] = useState(0)
 
   // The player's event handlers below are attached once (see the `[id]`-only effect) and
   // would otherwise close over a stale `state` forever, so they read from this ref instead.
@@ -148,6 +149,20 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
       if (pollRef.current) window.clearInterval(pollRef.current)
     }
   }, [state.isPlaying, onStateChange])
+
+  // How much of the video has actually buffered — the real signal behind the "preload"
+  // fill on the position bar (see WavePanel). Buffering can keep progressing even while
+  // paused, so this runs independently of `isPlaying`; a slower interval is plenty since
+  // buffering doesn't change nearly as fast as playback position.
+  useEffect(() => {
+    if (!ready) return
+    const id = window.setInterval(() => {
+      if (playerRef.current) {
+        setLoadedFraction(playerRef.current.getVideoLoadedFraction())
+      }
+    }, 1000)
+    return () => window.clearInterval(id)
+  }, [ready])
 
   const togglePlay = () => {
     if (!playerRef.current || !ready) return
@@ -290,6 +305,7 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
         progress={progress}
         accent={color}
         cueProgress={state.track ? state.cue / 100 : undefined}
+        loadedFraction={state.track ? loadedFraction : undefined}
         smoothPlayhead={smoothPlayhead}
         onSeek={handleWaveformSeek}
       />

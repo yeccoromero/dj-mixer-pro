@@ -8,11 +8,17 @@ interface WavePanelProps {
   accent?: 'lime' | 'aqua'
   /** 0-1 position of the saved cue point, drawn as a marker on the track. */
   cueProgress?: number
+  /** 0-1 fraction of the video actually buffered so far (`player.getVideoLoadedFraction()`),
+   * drawn as a light fill ahead of playback — the same "preload" cue YouTube's own bar
+   * shows. Omit to skip the fill entirely. */
+  loadedFraction?: number
   /** False right after an explicit seek (Cue/Marcar), so the line snaps to the new spot
    * instantly instead of gliding there like it does during normal playback. Defaults to
    * true. */
   smoothPlayhead?: boolean
-  /** Called with a 0-1 ratio when the user clicks or drags the track to seek. */
+  /** Called with a 0-1 ratio once the user releases a click/drag on the track — this is
+   * the one moment the real player actually seeks (see the note on `handlePointerUp` for
+   * why it isn't called on every pointer move too). */
   onSeek?: (progress: number) => void
 }
 
@@ -26,6 +32,7 @@ export const WavePanel: React.FC<WavePanelProps> = ({
   progress,
   accent = 'lime',
   cueProgress,
+  loadedFraction,
   smoothPlayhead = true,
   onSeek,
 }) => {
@@ -48,22 +55,26 @@ export const WavePanel: React.FC<WavePanelProps> = ({
     return Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
   }
 
+  // Dragging only ever moves this local `dragPosition` — cheap, local re-renders. The real
+  // player only actually seeks once, in `handlePointerUp`. Calling the real seek on every
+  // pointermove (as an earlier version did) meant dozens of `player.seekTo()` postMessage
+  // calls plus a full app state update per second while dragging, which is exactly what
+  // made the app hang after a drag — and it's not how a normal video player's seek bar
+  // behaves either: it always previews locally while dragging and commits once on release.
   const handlePointerMove = (event: PointerEvent) => {
-    const ratio = ratioFromClientX(event.clientX)
-    setDragPosition(ratio)
-    onSeekRef.current?.(ratio)
+    setDragPosition(ratioFromClientX(event.clientX))
   }
 
-  const handlePointerUp = () => {
+  const handlePointerUp = (event: PointerEvent) => {
+    const ratio = ratioFromClientX(event.clientX)
     setDragPosition(null)
+    onSeekRef.current?.(ratio)
     window.removeEventListener('pointermove', handlePointerMove)
     window.removeEventListener('pointerup', handlePointerUp)
   }
 
   const handleTrackPointerDown = (event: React.PointerEvent) => {
-    const ratio = ratioFromClientX(event.clientX)
-    setDragPosition(ratio)
-    onSeekRef.current?.(ratio)
+    setDragPosition(ratioFromClientX(event.clientX))
     window.addEventListener('pointermove', handlePointerMove)
     window.addEventListener('pointerup', handlePointerUp)
   }
@@ -74,6 +85,14 @@ export const WavePanel: React.FC<WavePanelProps> = ({
       onPointerDown={handleTrackPointerDown}
       className="relative h-6 cursor-pointer touch-none rounded-full bg-black/10"
     >
+      {typeof loadedFraction === 'number' && (
+        <div
+          className="pointer-events-none absolute inset-y-0 left-0 rounded-full bg-black/15"
+          style={{ width: `${Math.min(100, Math.max(0, loadedFraction * 100))}%` }}
+          title="Video precargado"
+          aria-hidden="true"
+        />
+      )}
       <div
         className={cn('pointer-events-none absolute top-0 h-full w-0.5 -translate-x-1/2')}
         style={{

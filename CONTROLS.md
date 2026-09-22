@@ -82,7 +82,7 @@ solo pasan por los botones de este panel, que son los que llaman a `player.playV
 |---|---|---|---|
 | **Cuerpo del deck** (clic en cualquier parte no interactiva) | Marca este deck como el "activo" | `DJMixer.activeDeck` | Determina a qué deck carga la próxima pista con el botón "Cargar en Deck" de `CoverFlow` |
 | **Contador LED (transcurrido) / Botón ▶/⏸ (Play/Pause) / Contador LED (restante)** | Los tres van en una sola fila, con el Play exactamente al centro entre los dos contadores (`grid-cols-[1fr_auto_1fr]`) — es el control principal del deck | El Play toca `DeckState.isPlaying` (lo actualiza el propio evento `onStateChange` del reproductor, no el clic directamente); los contadores solo leen `DeckState.currentTime`/`track.duration`, son informativos | Play deshabilitado hasta que el reproductor emite `onReady` |
-| **Barra de posición** *(`WavePanel.tsx`, sin forma de onda — solo una línea)* | Tocar salta a ese punto; **arrastrar** (mouse o dedo) mueve el avance en vivo mientras se sostiene, igual que la barra de progreso de YouTube — la línea con la manija circular, en el color del deck (lima/aqua), sigue el puntero al instante | `player.seekTo(...)` + `DeckState.currentTime` | Pensada para ser mínima a propósito: no hay datos reales de audio de un video de YouTube para dibujar una onda de verdad, así que en vez de fingir una, es solo la barra + la línea. Muestra además una marca blanca vertical en la posición del cue guardado |
+| **Barra de posición** *(`WavePanel.tsx`, sin forma de onda — solo una línea)* | Tocar salta a ese punto; **arrastrar** (mouse o dedo) mueve la línea en vivo mientras se sostiene, igual que la barra de progreso de YouTube; el salto real al video se confirma una sola vez, al soltar | `player.seekTo(...)` + `DeckState.currentTime`, solo en el `pointerup` | Pensada para ser mínima a propósito: no hay datos reales de audio de un video de YouTube para dibujar una onda de verdad, así que en vez de fingir una, es solo la barra + la línea, en el color del deck (lima/aqua), con una manija circular. Un relleno gris claro detrás de la línea muestra cuánto video está realmente precargado (`player.getVideoLoadedFraction()`, dato real de YouTube — igual que el "buffer" gris de su propio reproductor). Muestra además una marca blanca vertical en la posición del cue guardado |
 | **Botón CUE** *(más chico, debajo del Play — control secundario)* | **Toque corto**: salta al punto de cue guardado y pausa ahí (si estaba sonando, corta). **Mantener presionado**: reproduce de prueba desde el cue mientras se sostiene; al soltar, vuelve al cue y pausa de nuevo — igual que el botón Cue de un CDJ real | Lee `DeckState.cue` (0–100%) y `track.duration` para calcular el segundo exacto; `player.seekTo(...)` + `player.pauseVideo()`/`playVideo()` | Deshabilitado hasta `onReady` y si no hay pista asignada. El "soltar" se detecta con un listener global de `pointerup`, así funciona aunque el puntero se mueva fuera del botón antes de soltar |
 | **Botón MARCAR** | Guarda la posición actual de reproducción como el nuevo punto de cue — se escucha el momento exacto (o se busca arrastrando la barra) y se marca ahí, en vez de calcular a ciegas un % | `DeckState.cue` (`lib/mixerMath.ts#computeCuePercent`) | Da un flash visual breve de confirmación al tocarlo |
 | **Knob GAIN** *(tooltip: "Ganancia del deck: se combina con el crossfader")* | Se arrastra el disco completo (gira de verdad, con inercia — un giro rápido sigue girando hasta frenar) o se usan las flechas ↑/↓ del teclado | `DeckState.gain` | Se combina con el volumen del crossfader (`computeEffectiveVolume`) y se envía como `player.setVolume(...)`. Arranca al máximo (100), no a la mitad — ver nota de volumen abajo |
@@ -113,6 +113,19 @@ manija en el color del deck que sigue el puntero al arrastrar (`onPointerDown`/`
 `pointerup` con listeners globales, mismo patrón que ya se usa para el botón CUE), con una
 transición CSS para que la reproducción normal se vea fluida sin saltos, y sin transición durante
 un arrastre o un salto explícito para que la línea responda al instante.
+
+**Bug corregido — arrastrar y soltar colgaba la app:** la versión hecha a mano seguía llamando a
+`onSeek` en cada evento `pointermove` durante el arrastre — igual que el problema original de
+WaveSurfer, solo que ahora la causa era propia. Cada llamada disparaba un `player.seekTo(...)` real
+(un mensaje al iframe de YouTube) más una actualización de estado de toda la app, y un arrastre
+normal genera decenas de eventos `pointermove` por segundo — eso es lo que colgaba el navegador
+después de soltar. Se corrigió separando las dos cosas, igual que hace cualquier reproductor de
+video real: mientras se arrastra, solo se mueve la posición visual local (`dragPosition`, gratis,
+sin tocar el reproductor); el salto real al video se confirma una única vez, en el evento
+`pointerup` al soltar — así el video recién empieza a "precargar" esa nueva posición cuando el
+usuario decide soltar, no en cada pixel de arrastre. Cubierto por un test de regresión que simula
+un arrastre completo y confirma que `onSeek` no se llama ni una vez hasta soltar; se verificó que
+fallaba (llamaba a `onSeek` 3 veces) contra el código anterior.
 
 **¿Qué son Gain y Cue, en términos simples?**
 - **Gain** = qué tan fuerte suena ese deck. Se multiplica con la posición del crossfader: si el
@@ -295,7 +308,9 @@ altas, bajas y correcciones de duración incluidas.
 | Cue: toque corto (salta y pausa) | ✅ (`Deck.test.tsx`) | — (requiere reproductor real; el flujo se confirmó visualmente en navegador) |
 | Cue: mantener presionado (preview) y soltar (vuelve y pausa) | ✅ (`Deck.test.tsx`, timers simulados) | — (requiere reproductor real) |
 | MARCAR (guarda la posición actual como cue) | ✅ (`Deck.test.tsx`, `mixerMath.test.ts`) | — (requiere reproductor real) |
-| Barra de posición (tocar/arrastrar para saltar) | ✅ (`Deck.test.tsx`, prop capturada del componente mockeado) | ✅ (arrastre confirmado visualmente en navegador, la línea sigue el puntero sin errores de consola) |
+| Barra de posición (tocar/arrastrar para saltar) | ✅ (`Deck.test.tsx`, `WavePanel.test.tsx`) | ✅ (arrastre confirmado visualmente en navegador, la línea sigue el puntero sin errores de consola) |
+| Arrastrar no cuelga la app — solo un salto real al soltar | ✅ (`WavePanel.test.tsx`, confirmado que falla sin el fix) | ✅ (arrastre completo + suelte, app responde en <1s) |
+| Precarga real del video (`getVideoLoadedFraction`) mostrada en la barra | ✅ (`WavePanel.test.tsx`) | — (requiere reproductor real) |
 | CoverFlow — no se cuelga al borrar la tarjeta activa en la última posición | ✅ (test de regresión, confirmado que falla sin el fix) | ✅ |
 | Verificación de reproducibilidad antes de agregar (bloquea videos no embebibles) | ✅ (`AddTrackModal.test.tsx`, chequeo mockeado) | — (requiere red real hacia YouTube; el flujo de "Verificando…" se confirmó en navegador) |
 

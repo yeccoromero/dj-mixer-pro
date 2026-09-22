@@ -3,9 +3,13 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { Deck } from './Deck'
 import type { DeckState, Track } from './DJMixer'
 
-let capturedWavePanelProps: { onSeek?: (ratio: number) => void; cueProgress?: number } | null = null
+let capturedWavePanelProps: {
+  onSeek?: (ratio: number) => void
+  cueProgress?: number
+  loadedFraction?: number
+} | null = null
 vi.mock('./WavePanel', () => ({
-  WavePanel: (props: { onSeek?: (ratio: number) => void; cueProgress?: number }) => {
+  WavePanel: (props: { onSeek?: (ratio: number) => void; cueProgress?: number; loadedFraction?: number }) => {
     capturedWavePanelProps = props
     return null
   },
@@ -28,6 +32,7 @@ const mockPlayer = {
   setVolume: vi.fn(),
   getCurrentTime: vi.fn(() => 0),
   getDuration: vi.fn(() => 0),
+  getVideoLoadedFraction: vi.fn(() => 0),
   loadVideoById: vi.fn(),
   destroy: vi.fn(),
 }

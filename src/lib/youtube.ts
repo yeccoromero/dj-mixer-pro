@@ -5,6 +5,9 @@ export interface YouTubePlayer {
   setVolume(volume: number): void
   getCurrentTime(): number
   getDuration(): number
+  /** 0-1 fraction of the video actually buffered so far — the real signal behind the
+   * "preload" fill on the position bar, the same thing YouTube's own player shows. */
+  getVideoLoadedFraction(): number
   loadVideoById(videoId: string): void
   destroy(): void
 }
