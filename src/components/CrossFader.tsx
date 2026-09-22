@@ -1,84 +1,149 @@
-import React, { useCallback, useEffect, useRef } from 'react'
-import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
+import React, { useEffect, useRef, useState } from 'react'
+import { gsap, Draggable } from '@/lib/gsapSetup'
+import { cn } from '@/lib/utils'
 
 interface CrossFaderProps {
   value: number // 0 (full A) - 100 (full B)
   onChange: (value: number) => void
 }
 
+/** Piecewise-linear interpolation between named stops, e.g. [[0,1],[50,0.5],[100,0.15]]. */
+function lerpStops(value: number, stops: [number, number][]) {
+  for (let i = 0; i < stops.length - 1; i++) {
+    const [x0, y0] = stops[i]
+    const [x1, y1] = stops[i + 1]
+    if (value >= x0 && value <= x1) {
+      const t = (value - x0) / (x1 - x0)
+      return Math.round((y0 + (y1 - y0) * t) * 1000) / 1000
+    }
+  }
+  return stops[stops.length - 1][1]
+}
+
 export const CrossFader: React.FC<CrossFaderProps> = ({ value, onChange }) => {
   const trackRef = useRef<HTMLDivElement>(null)
-  const x = useMotionValue(value)
-  const isDragging = useRef(false)
+  const handleRef = useRef<HTMLDivElement>(null)
+  const draggableRef = useRef<Draggable | null>(null)
+  const isDraggingRef = useRef(false)
+  const [isDragging, setIsDragging] = useState(false)
 
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+
+  // Create the Draggable once: the handle slides along the track (type: "x"), bounded
+  // to stay inside it, with InertiaPlugin so a quick flick keeps gliding after release
+  // instead of stopping dead where the pointer let go.
   useEffect(() => {
-    if (!isDragging.current) x.set(value)
-  }, [value, x])
+    const track = trackRef.current
+    const handle = handleRef.current
+    if (!track || !handle) return
 
-  const limeOpacity = useTransform(x, [0, 50, 100], [1, 0.5, 0.15])
-  const aquaOpacity = useTransform(x, [0, 50, 100], [0.15, 0.5, 1])
+    const maxX = () => Math.max(1, track.offsetWidth - handle.offsetWidth)
 
-  const updateFromClientX = useCallback(
-    (clientX: number) => {
-      const track = trackRef.current
-      if (!track) return
-      const rect = track.getBoundingClientRect()
-      const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
-      const next = Math.round(ratio * 100)
-      x.set(next)
-      onChange(next)
-    },
-    [onChange, x],
-  )
+    const reportFromX = function (this: Draggable) {
+      const ratio = Math.min(1, Math.max(0, this.x / maxX()))
+      onChangeRef.current(Math.round(ratio * 100))
+    }
 
-  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    event.currentTarget.setPointerCapture(event.pointerId)
-    isDragging.current = true
-    updateFromClientX(event.clientX)
+    const [draggable] = Draggable.create(handle, {
+      type: 'x',
+      bounds: track,
+      inertia: true,
+      onPress: () => {
+        isDraggingRef.current = true
+        setIsDragging(true)
+      },
+      onDrag: reportFromX,
+      onThrowUpdate: reportFromX,
+      onRelease: () => {
+        isDraggingRef.current = false
+      },
+      onThrowComplete: () => {
+        isDraggingRef.current = false
+        setIsDragging(false)
+      },
+    })
+    draggableRef.current = draggable
+    gsap.set(handle, { x: (value / 100) * maxX() })
+
+    return () => {
+      draggable.kill()
+      draggableRef.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Keep the handle in sync when `value` changes from outside (the "Centrar" button),
+  // animating smoothly — but never while the user is actively dragging it.
+  useEffect(() => {
+    if (isDraggingRef.current) return
+    const track = trackRef.current
+    const handle = handleRef.current
+    const draggable = draggableRef.current
+    if (!track || !handle || !draggable) return
+    const maxX = Math.max(1, track.offsetWidth - handle.offsetWidth)
+    gsap.to(handle, {
+      x: (value / 100) * maxX,
+      duration: 0.5,
+      ease: 'power3.out',
+      onUpdate: () => draggable.update(),
+    })
+  }, [value])
+
+  // Clicking anywhere on the track (not grabbing the handle itself) jumps the fader
+  // there directly — GSAP's Draggable only owns the handle, so this restores the
+  // "click the track to set it" behavior the original implementation had.
+  const handleTrackPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.target === handleRef.current) return
+    const track = trackRef.current
+    if (!track) return
+    const rect = track.getBoundingClientRect()
+    const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width))
+    onChange(Math.round(ratio * 100))
   }
 
-  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.buttons !== 1) return
-    updateFromClientX(event.clientX)
-  }
-
-  const handlePointerUp = () => {
-    isDragging.current = false
-  }
-
-  const snapCenter = () => {
-    animate(x, 50, { type: 'spring', stiffness: 300, damping: 25, onUpdate: (v) => onChange(Math.round(v)) })
-  }
+  const limeOpacity = lerpStops(value, [
+    [0, 1],
+    [50, 0.5],
+    [100, 0.15],
+  ])
+  const aquaOpacity = lerpStops(value, [
+    [0, 0.15],
+    [50, 0.5],
+    [100, 1],
+  ])
 
   return (
     <div className="panel flex flex-col gap-3 p-5">
       <div className="flex items-center justify-between">
-        <motion.span className="chip-lime music-number" style={{ opacity: limeOpacity }}>
+        <span className="chip-lime music-number" style={{ opacity: limeOpacity }}>
           DECK A
-        </motion.span>
+        </span>
         <button
           type="button"
-          onClick={snapCenter}
+          onClick={() => onChange(50)}
           className="text-[11px] uppercase tracking-wide text-muted-foreground hover:text-foreground"
         >
           Centrar
         </button>
-        <motion.span className="chip-aqua music-number" style={{ opacity: aquaOpacity }}>
+        <span className="chip-aqua music-number" style={{ opacity: aquaOpacity }}>
           DECK B
-        </motion.span>
+        </span>
       </div>
 
       <div
         ref={trackRef}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
+        onPointerDown={handleTrackPointerDown}
         className="relative h-8 w-full cursor-pointer touch-none rounded-full bg-gradient-to-r from-lime-accent/70 via-muted to-aqua-accent/70 px-1"
       >
         <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-black/10" />
-        <motion.div
-          className="knob absolute top-1/2 h-7 w-4 -translate-y-1/2 rounded-md border border-black/20"
-          style={{ left: useTransform(x, (v) => `calc(${v}% - 8px)`) }}
+        <div
+          ref={handleRef}
+          className={cn(
+            'knob absolute left-0 h-7 w-4 cursor-grab rounded-md border border-black/20 active:cursor-grabbing',
+            isDragging && 'ring-2 ring-lime-accent',
+          )}
+          style={{ top: 'calc(50% - 14px)' }}
         />
       </div>
     </div>

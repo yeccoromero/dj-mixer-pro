@@ -2,6 +2,12 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { Knob } from './Knob'
 
+// The dial itself is now driven by GSAP's Draggable (type: "rotation") with
+// InertiaPlugin for the actual drag/flick-and-glide gesture — that isn't meaningfully
+// simulatable through jsdom + fireEvent, so it's verified against the real running app
+// with Playwright instead. These tests cover the parts still owned by React: rendered
+// a11y attributes, the keyboard interaction path, clamping, and mount/unmount safety.
+
 describe('Knob', () => {
   it('renders its label and current value for assistive tech', () => {
     render(<Knob label="Gain" value={50} onChange={vi.fn()} />)
@@ -50,5 +56,10 @@ describe('Knob', () => {
     slider.focus()
     slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
     expect(onChange).toHaveBeenCalledWith(0)
+  })
+
+  it('creates and cleans up its Draggable instance without throwing', () => {
+    const { unmount } = render(<Knob label="Gain" value={50} onChange={vi.fn()} />)
+    expect(() => unmount()).not.toThrow()
   })
 })

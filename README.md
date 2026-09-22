@@ -1,12 +1,12 @@
 # DJ Mixer Pro
 
-Un DJ mixer profesional en el navegador construido con React, TypeScript, Tailwind CSS y Framer Motion. Reproduce pistas de YouTube en dos decks con crossfader funcional, efectos en vivo y una biblioteca en stack de tarjetas.
+Un DJ mixer profesional en el navegador construido con React, TypeScript, Tailwind CSS, Framer Motion y GSAP. Reproduce pistas de YouTube en dos decks con crossfader funcional, efectos en vivo y una biblioteca en stack de tarjetas.
 
 ## Funcionalidades
 
 - **Dos decks (A y B)** con reproducción de YouTube vía la YouTube IFrame API
-- **Crossfader funcional** que controla el volumen de cada deck en tiempo real
-- **Knobs interactivos** (Gain, Filter, Cue point) con arrastre vertical o teclado, y tooltips explicando cada uno
+- **Crossfader con físicas reales** (GSAP Draggable + inercia): clic para saltar, arrastre, y "flick" que desliza y frena solo
+- **Knobs interactivos** (Gain, Filter, Cue point) que giran de verdad con inercia (GSAP), o por teclado, con tooltips explicando cada uno
 - **Biblioteca en stack de tarjetas** (arrastrable/swipeable) con carátula a pantalla completa, duración visible, y opción de quitar pistas
 - **Modal para agregar pistas** desde cualquier URL o ID de YouTube
 - **Panel de efectos** (Siren, Airhorn, Laser, Radio) sintetizados con Web Audio API
@@ -16,7 +16,7 @@ Un DJ mixer profesional en el navegador construido con React, TypeScript, Tailwi
 
 ## Stack
 
-React 19 · TypeScript · Vite · Tailwind CSS 3 · Framer Motion · Radix UI · WaveSurfer.js · lucide-react
+React 19 · TypeScript · Vite · Tailwind CSS 3 · Framer Motion · GSAP (Draggable + InertiaPlugin) · Radix UI · WaveSurfer.js · lucide-react
 
 ## Desarrollo
 
@@ -36,7 +36,7 @@ src/
 │   ├── ui/               # Primitivas (button, dialog, slider, label)
 │   ├── DJMixer.tsx       # Componente principal
 │   ├── Deck.tsx          # Deck individual con integración de YouTube
-│   ├── CrossFader.tsx    # Crossfader con drag
+│   ├── CrossFader.tsx    # Crossfader (GSAP Draggable + inercia)
 │   ├── CoverFlow.tsx     # Biblioteca en stack de tarjetas
 │   ├── AddTrackModal.tsx # Modal para agregar tracks
 │   ├── Knob.tsx          # Knob circular personalizado

@@ -1,57 +1,47 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { CrossFader } from './CrossFader'
 
-// jsdom reports 0 for all layout metrics; give the track a real, stable box
-// so drag-position math (clientX -> percentage) is testable.
-beforeEach(() => {
-  Element.prototype.getBoundingClientRect = () =>
-    ({ left: 0, right: 200, width: 200, top: 0, bottom: 0, height: 0, x: 0, y: 0, toJSON() {} }) as DOMRect
-})
+// The actual drag gesture is now handled internally by GSAP's Draggable (its own
+// pointer listeners, not React props), which isn't meaningfully simulatable through
+// jsdom + fireEvent. That physics — bounded drag, inertia/coast-to-stop on release —
+// is verified against the real running app with Playwright instead. These tests cover
+// what's still controlled by React: the initial/controlled position, the derived
+// DECK A / DECK B opacity, and the "Centrar" button.
 
 describe('CrossFader', () => {
-  it('reports 0 (full deck A) when dragged to the left edge', () => {
-    const onChange = vi.fn()
-    render(<CrossFader value={50} onChange={onChange} />)
-    const trackEl = document.querySelector('.cursor-pointer') as HTMLElement
-    fireEvent.pointerDown(trackEl, { clientX: 0, pointerId: 1 })
-    expect(onChange).toHaveBeenCalledWith(0)
+  it('renders a track and a draggable handle', () => {
+    render(<CrossFader value={50} onChange={vi.fn()} />)
+    expect(document.querySelector('.knob')).toBeInTheDocument()
   })
 
-  it('reports 100 (full deck B) when dragged to the right edge', () => {
+  it('"Centrar" reports the middle value', () => {
     const onChange = vi.fn()
-    render(<CrossFader value={50} onChange={onChange} />)
-    const trackEl = document.querySelector('.cursor-pointer') as HTMLElement
-    fireEvent.pointerDown(trackEl, { clientX: 200, pointerId: 1 })
-    expect(onChange).toHaveBeenCalledWith(100)
-  })
-
-  it('tracks pointer movement while the button is held', () => {
-    const onChange = vi.fn()
-    render(<CrossFader value={50} onChange={onChange} />)
-    const trackEl = document.querySelector('.cursor-pointer') as HTMLElement
-    fireEvent.pointerDown(trackEl, { clientX: 100, pointerId: 1 })
-    fireEvent.pointerMove(trackEl, { clientX: 150, pointerId: 1, buttons: 1 })
-    expect(onChange).toHaveBeenLastCalledWith(75)
-  })
-
-  it('ignores pointer movement once the button is released (no buttons pressed)', () => {
-    const onChange = vi.fn()
-    render(<CrossFader value={50} onChange={onChange} />)
-    const trackEl = document.querySelector('.cursor-pointer') as HTMLElement
-    fireEvent.pointerDown(trackEl, { clientX: 100, pointerId: 1 })
-    onChange.mockClear()
-    fireEvent.pointerMove(trackEl, { clientX: 180, pointerId: 1, buttons: 0 })
-    expect(onChange).not.toHaveBeenCalled()
-  })
-
-  it('"Centrar" animates the crossfader back toward the middle', async () => {
-    const onChange = vi.fn()
-    render(<CrossFader value={0} onChange={onChange} />)
+    render(<CrossFader value={20} onChange={onChange} />)
     fireEvent.click(screen.getByText('Centrar'))
-    await vi.waitFor(() => {
-      expect(onChange).toHaveBeenCalled()
-      expect(onChange.mock.calls.at(-1)?.[0]).toBe(50)
-    })
+    expect(onChange).toHaveBeenCalledWith(50)
+  })
+
+  it('DECK A is fully opaque and DECK B nearly transparent at value 0', () => {
+    render(<CrossFader value={0} onChange={vi.fn()} />)
+    expect(screen.getByText('DECK A')).toHaveStyle({ opacity: '1' })
+    expect(screen.getByText('DECK B')).toHaveStyle({ opacity: '0.15' })
+  })
+
+  it('DECK B is fully opaque and DECK A nearly transparent at value 100', () => {
+    render(<CrossFader value={100} onChange={vi.fn()} />)
+    expect(screen.getByText('DECK B')).toHaveStyle({ opacity: '1' })
+    expect(screen.getByText('DECK A')).toHaveStyle({ opacity: '0.15' })
+  })
+
+  it('both decks are at half opacity when centered', () => {
+    render(<CrossFader value={50} onChange={vi.fn()} />)
+    expect(screen.getByText('DECK A')).toHaveStyle({ opacity: '0.5' })
+    expect(screen.getByText('DECK B')).toHaveStyle({ opacity: '0.5' })
+  })
+
+  it('cleans up the Draggable instance on unmount without throwing', () => {
+    const { unmount } = render(<CrossFader value={50} onChange={vi.fn()} />)
+    expect(() => unmount()).not.toThrow()
   })
 })

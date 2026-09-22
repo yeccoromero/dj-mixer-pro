@@ -73,9 +73,14 @@ Cada deck es dueño de **un reproductor de YouTube** (vía la IFrame API, `lib/y
 | **Cuerpo del deck** (clic en cualquier parte no interactiva) | Marca este deck como el "activo" | `DJMixer.activeDeck` | Determina a qué deck carga la próxima pista con el botón "Cargar en Deck" de `CoverFlow` |
 | **Botón ▶/⏸ (Play/Pause)** | Reproduce o pausa el video de YouTube (`player.playVideo()` / `player.pauseVideo()`) | `DeckState.isPlaying` (lo actualiza el propio evento `onStateChange` del reproductor, no el clic directamente) | Deshabilitado hasta que el reproductor emite `onReady` |
 | **Botón CUE** *(tooltip: "Salta la reproducción al punto marcado por 'Cue pt.'")* | Salta la reproducción al punto de cue (`player.seekTo(...)`) | Lee `DeckState.cue` (0–100%) y `track.duration` para calcular el segundo exacto | Deshabilitado hasta `onReady` y si no hay pista asignada |
-| **Knob GAIN** *(tooltip: "Ganancia del deck: se combina con el crossfader")* | Arrastre vertical (o flechas ↑/↓ con teclado) ajusta la ganancia del deck, 0–100 | `DeckState.gain` | Se combina con el volumen del crossfader (`computeEffectiveVolume`) y se envía como `player.setVolume(...)` |
+| **Knob GAIN** *(tooltip: "Ganancia del deck: se combina con el crossfader")* | Arrastrás el disco completo (gira de verdad, con inercia — flickeálo y sigue girando hasta frenar) o usás las flechas ↑/↓ con teclado | `DeckState.gain` | Se combina con el volumen del crossfader (`computeEffectiveVolume`) y se envía como `player.setVolume(...)` |
 | **Knob FILTER** *(tooltip aclara que es solo visual)* | Igual interacción que Gain | `DeckState.filter` | Aplica un filtro CSS `saturate()` en vivo sobre el video — efecto visual, no de audio (el audio del embed de YouTube no es interceptable) |
 | **Knob CUE PT.** *(tooltip: "Define a qué % de la pista salta el botón 'Cue'")* | Igual interacción | `DeckState.cue` | Define el % del track al que salta el botón CUE |
+
+**Físicas reales del knob (GSAP):** cada knob es un `Draggable` de GSAP (`type: "rotation"`) con
+`InertiaPlugin` — arrastrarlo gira el disco entero (no solo una agujita suelta), y si lo soltás con
+velocidad, sigue girando por su cuenta y frena naturalmente en vez de detenerse en seco donde
+soltaste el mouse. Las flechas del teclado siguen funcionando igual que antes (accesibilidad).
 
 **¿Qué son Gain y Cue, en criollo?**
 - **Gain** = qué tan fuerte suena ese deck. Se multiplica con la posición del crossfader: si el
@@ -105,8 +110,13 @@ biblioteca y buscar otra versión/fuente.
 
 | Control | Qué hace | Estado que toca |
 |---|---|---|
-| **Barra arrastrable** | Al arrastrar (mouse o touch, vía Pointer Events), calcula la posición 0–100 según dónde se soltó el puntero sobre la barra | `DJMixer.crossFaderValue` |
-| **Botón "Centrar"** | Anima la posición de vuelta a 50 (mitad) con un spring de Framer Motion | `DJMixer.crossFaderValue` |
+| **Clic en cualquier parte de la barra** | Salta el fader directamente a esa posición | `DJMixer.crossFaderValue` |
+| **Arrastrar el handle** | Lo deslizás vos mismo; si lo soltás con velocidad (un "flick"), sigue deslizando por inercia y frena solo, en vez de detenerse en seco | `DJMixer.crossFaderValue` |
+| **Botón "Centrar"** | Anima la posición de vuelta a 50 (mitad) | `DJMixer.crossFaderValue` |
+
+**Físicas reales (GSAP):** el handle es un `Draggable` de GSAP (`type: "x"`, acotado a la barra) con
+`InertiaPlugin`, igual mecanismo que los knobs — por eso ambos controles se sienten consistentes
+entre sí.
 
 **Conexión:** un `useEffect` en `DJMixer.tsx` observa `crossFaderValue` y calcula
 `computeCrossfaderVolumes(valor)` → `{ volumeA, volumeB }` (0 = A a full volumen, 100 = B a full
@@ -176,8 +186,8 @@ altas, bajas y correcciones de duración incluidas.
 |---|---|---|
 | Play / Pause | ✅ (`Deck.test.tsx`, reproductor mockeado) | ✅ (queda deshabilitado correctamente; YouTube real no es alcanzable desde este sandbox de red) |
 | Cue | ✅ cálculo del segundo exacto | ✅ |
-| Knobs (Gain/Filter/Cue pt.) | ✅ teclado + clamps | ✅ |
-| Crossfader (drag + Centrar) | ✅ | ✅ |
+| Knobs (Gain/Filter/Cue pt.) | ✅ teclado + clamps | ✅ (drag real con mouse + inercia/flick confirmados con Playwright) |
+| Crossfader (clic-para-saltar + drag + Centrar) | ✅ (lo controlado por React) | ✅ (clic, drag, flick con inercia y Centrar, todos confirmados con Playwright) |
 | Activar deck (A/B) | — | ✅ |
 | CoverFlow (‹ › + swipe, sin bloquearse tras seleccionar) | ✅ | ✅ |
 | CoverFlow — tarjetas laterales visibles, solo la activa es accionable | ✅ | ✅ |
