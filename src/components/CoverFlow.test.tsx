@@ -35,23 +35,30 @@ describe('CoverFlow', () => {
     expect(screen.getByText('Agregar pista')).toBeInTheDocument()
   })
 
-  it('shows the first track as the front card and a 1/N counter by default', () => {
+  it('shows the front card active and the next cards visible behind it', () => {
     setup()
-    expect(screen.getByText('Track One')).toBeInTheDocument()
-    expect(screen.getByText('1 / 3')).toBeInTheDocument()
+    expect(screen.getByText('Track One — Artist One')).toBeInTheDocument()
+    // Side cards are rendered (visible), just not actionable yet.
+    expect(screen.getByText('Track Two')).toBeInTheDocument()
+    expect(screen.getByText('Track Three')).toBeInTheDocument()
+  })
+
+  it('only the front card shows the delete and "Cargar en Deck" actions', () => {
+    setup()
+    expect(screen.getByLabelText('Quitar "Track One" de la biblioteca')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Quitar "Track Two" de la biblioteca')).not.toBeInTheDocument()
+    expect(screen.getByText('Cargar en Deck A')).toBeInTheDocument()
   })
 
   it('"Siguiente" moves the front card forward, and keeps working after a track is loaded', () => {
     setup()
     fireEvent.click(screen.getByLabelText('Siguiente'))
-    expect(screen.getByText('2 / 3')).toBeInTheDocument()
-    expect(screen.getByText('Track Two')).toBeInTheDocument()
+    expect(screen.getByText('Track Two — Artist Two')).toBeInTheDocument()
 
     // Regression check: selecting a track must not lock the carousel in place.
     fireEvent.click(screen.getByText('Cargar en Deck A'))
     fireEvent.click(screen.getByLabelText('Siguiente'))
-    expect(screen.getByText('3 / 3')).toBeInTheDocument()
-    expect(screen.getByText('Track Three')).toBeInTheDocument()
+    expect(screen.getByText('Track Three — Artist Three')).toBeInTheDocument()
   })
 
   it('"Anterior" is disabled on the first track and "Siguiente" on the last', () => {
@@ -59,14 +66,20 @@ describe('CoverFlow', () => {
     expect(screen.getByLabelText('Anterior')).toBeDisabled()
     fireEvent.click(screen.getByLabelText('Siguiente'))
     fireEvent.click(screen.getByLabelText('Siguiente'))
-    expect(screen.getByText('3 / 3')).toBeInTheDocument()
+    expect(screen.getByText('Track Three — Artist Three')).toBeInTheDocument()
     expect(screen.getByLabelText('Siguiente')).toBeDisabled()
+  })
+
+  it('clicking a side (non-active) card brings it to the front without loading it', () => {
+    const { onTrackSelect } = setup()
+    fireEvent.click(screen.getByText('Track Two'))
+    expect(screen.getByText('Track Two — Artist Two')).toBeInTheDocument()
+    expect(onTrackSelect).not.toHaveBeenCalled()
   })
 
   it('re-centers on an externally selected track (e.g. loaded by clicking a deck)', () => {
     setup({ selectedTrack: tracks[2] })
-    expect(screen.getByText('3 / 3')).toBeInTheDocument()
-    expect(screen.getByText('Track Three')).toBeInTheDocument()
+    expect(screen.getByText('Track Three — Artist Three')).toBeInTheDocument()
   })
 
   it('"Cargar en Deck X" assigns the front card to the active deck', () => {
@@ -81,7 +94,7 @@ describe('CoverFlow', () => {
     expect(onRemoveTrack).toHaveBeenCalledWith('1')
   })
 
-  it('shows the track duration formatted as m:ss', () => {
+  it('shows the front track duration formatted as m:ss', () => {
     setup()
     expect(screen.getByText(/Artist One · 2:05/)).toBeInTheDocument()
   })

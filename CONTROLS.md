@@ -115,39 +115,58 @@ su propio Gain (ver arriba) antes de aplicarlo al reproductor real.
 
 ---
 
-## CoverFlow — biblioteca en stack de tarjetas (`CoverFlow.tsx`)
+## CoverFlow — biblioteca en carrusel de tarjetas (`CoverFlow.tsx`)
 
-Rediseñada como un mazo de tarjetas apiladas (carátula a pantalla completa, tarjeta activa
-arrastrable), en vez del carrusel plano anterior.
+Fan de tarjetas (carátula a pantalla completa) inspirado en el carrusel 3D original: la tarjeta
+activa queda al frente y agrandada; hasta 2 tarjetas a cada lado quedan **visibles** detrás,
+achicadas y con menos opacidad, para poder "hojear" la biblioteca de un vistazo.
 
 | Control | Qué hace | Estado que toca |
 |---|---|---|
-| **‹ Anterior / › Siguiente** | Mueve la tarjeta activa del stack (se deshabilitan en los extremos) | estado local `centerIndex` — **independiente** de qué pista esté cargada en un deck, para que siempre respondan |
+| **‹ Anterior / › Siguiente** | Mueve cuál tarjeta está al frente (se deshabilitan en los extremos) | estado local `centerIndex` — **independiente** de qué pista esté cargada en un deck, para que siempre respondan |
 | **Arrastrar la tarjeta activa** | Igual que Siguiente/Anterior pero con swipe (izquierda = siguiente, derecha = anterior); si el arrastre no supera el umbral, la tarjeta vuelve a su lugar | `centerIndex` |
-| **Botón ✕ (esquina superior de la tarjeta)** | Quita esa pista de la biblioteca permanentemente | `DJMixer.tracks` (vía `onRemoveTrack`), y limpia el deck que la tuviera cargada |
-| **Botón "Cargar en Deck A/B"** (el texto cambia según cuál deck esté activo) | Asigna la tarjeta de arriba del stack al deck activo | `DJMixer.selectedTrack`, `deckA.track` o `deckB.track` |
+| **Clic en una tarjeta lateral** | La trae al frente (la centra), **sin** cargarla en ningún deck | `centerIndex` |
+| **Botón ✕** *(solo visible en la tarjeta del frente)* | Quita esa pista de la biblioteca permanentemente | `DJMixer.tracks` (vía `onRemoveTrack`), y limpia el deck que la tuviera cargada |
+| **Botón "Cargar en Deck A/B"** *(solo visible en la tarjeta del frente; el texto cambia según cuál deck esté activo)* | Asigna la tarjeta del frente al deck activo | `DJMixer.selectedTrack`, `deckA.track` o `deckB.track` |
 | **Botón "Agregar pista"** | Abre el modal `AddTrackModal` | — |
 
-**Antes vs. ahora:** en la versión anterior, tocar cualquier miniatura la seleccionaba y cargaba de
-inmediato — y una vez seleccionada, las flechas dejaban de mover el stack (bug ya corregido). Ahora
-navegar el stack (flechas/swipe) y cargar una pista en el deck son dos acciones explícitas y
-separadas, así siempre podés "hojear" la biblioteca sin disparar una carga accidental.
+**Solo la tarjeta activa es "accionable":** las tarjetas laterales no tienen botón de borrar ni de
+cargar — eso evita borrar o cargar algo por error mientras solo estás mirando la biblioteca.
+Tocar una tarjeta lateral únicamente la trae al frente; desde ahí sí aparecen sus acciones.
 
-**Duración visible:** cada tarjeta muestra `artista · duración (m:ss)` para identificar la pista
-sin tener que cargarla.
+**Antes vs. ahora:** en la primera versión, tocar cualquier miniatura la seleccionaba y cargaba de
+inmediato — y una vez seleccionada, las flechas dejaban de mover el carrusel (bug ya corregido).
+Ahora navegar (flechas/swipe/clic en una lateral) y cargar una pista en el deck son dos acciones
+explícitas y separadas.
+
+**Duración visible:** la tarjeta activa muestra `artista · duración (m:ss)` para identificarla sin
+tener que cargarla.
 
 ### Modal "Agregar pista" (`AddTrackModal.tsx`)
 
 | Control | Qué hace |
 |---|---|
-| **Campo "URL o ID de YouTube"** | Acepta un ID de 11 caracteres, una URL completa (`youtube.com/watch?v=`), un link corto (`youtu.be/`) o un link de Shorts. Se valida con `lib/youtubeId.ts#extractYouTubeId`, que **rechaza** cualquier cosa que no matchee el patrón exacto de un ID de YouTube (evita inyectar valores arbitrarios en la URL del thumbnail o en el reproductor) |
-| **Campos Título / Artista / Duración** | Opcionales; si se dejan vacíos, se usan valores por defecto ("Pista sin título", "Artista desconocido", 180s) |
+| **Campo "URL o ID de YouTube"** | Acepta un ID de 11 caracteres, una URL completa (`youtube.com/watch?v=`), un link corto (`youtu.be/`) o un link de Shorts. Se valida con `lib/youtubeId.ts#extractYouTubeId`, que **rechaza** cualquier cosa que no matchee el patrón exacto de un ID de YouTube (evita inyectar valores arbitrarios en la URL del thumbnail o en el reproductor). Al salir del campo (`onBlur`), dispara la búsqueda automática de metadatos (ver abajo) |
+| **Campos Título / Artista / Duración** | Se autocompletan desde YouTube si es posible (ver abajo); si quedan vacíos al enviar, se usan valores por defecto ("Pista sin título", "Artista desconocido", 180s). Editable en cualquier momento — lo que ya escribiste a mano nunca se sobrescribe |
 | **Botón "Añadir a la biblioteca"** | Valida el link; si es inválido muestra un error inline; si es válido, construye un `Track` y llama `onAddTrack(track)`, cierra el modal y limpia el formulario |
+
+**Autocompletado desde la URL original (`lib/youtubeOembed.ts`):** al pegar un link y salir del
+campo, se consulta el endpoint público `oEmbed` de YouTube (`youtube.com/oembed?url=...`) — no
+requiere API key ni backend propio, es una llamada directa desde el navegador. Si responde,
+completa Título, Artista (el nombre del canal) y una miniatura de mejor calidad; si falla (sin
+red, video privado/eliminado, timeout de 6s), no rompe nada — el formulario queda como estaba para
+completarlo a mano. Un ícono de carga (⟳) aparece junto al campo mientras se consulta.
+
+**Duración real desde el reproductor:** como `oEmbed` no incluye la duración del video, esta se
+"autocorrige" sola la primera vez que la pista se reproduce de verdad: en cuanto el reproductor de
+YouTube del deck confirma la duración real (`player.getDuration()`), reemplaza el valor por
+defecto (180s) tanto en la biblioteca como en el deck que la tenga cargada.
 
 **Conexión:** `onAddTrack` sube hasta `DJMixer.handleAddTrack`, que agrega la pista al array
 `tracks` **y** lo persiste en `localStorage` (clave `dj-mixer-tracks`). `onRemoveTrack` hace lo
-mismo mecanismo a la inversa (filtra el array y vuelve a guardar) — por eso la biblioteca sobrevive
-a un refresh de página, altas y bajas incluidas.
+mismo mecanismo a la inversa (filtra el array y vuelve a guardar), y `onDurationResolved` actualiza
+la duración de una pista existente — por eso la biblioteca sobrevive a un refresh de página, con
+altas, bajas y correcciones de duración incluidas.
 
 ---
 
@@ -161,8 +180,11 @@ a un refresh de página, altas y bajas incluidas.
 | Crossfader (drag + Centrar) | ✅ | ✅ |
 | Activar deck (A/B) | — | ✅ |
 | CoverFlow (‹ › + swipe, sin bloquearse tras seleccionar) | ✅ | ✅ |
-| CoverFlow — quitar pista de la biblioteca | ✅ | — |
+| CoverFlow — tarjetas laterales visibles, solo la activa es accionable | ✅ | ✅ |
+| CoverFlow — quitar pista de la biblioteca | ✅ | ✅ |
 | CoverFlow — "Cargar en Deck X" | ✅ | ✅ |
 | Agregar pista (válida/ inválida) | ✅ | ✅ |
+| Autocompletado de Título/Artista desde `oEmbed` | ✅ (fetch mockeado) | — (este sandbox bloquea la red hacia youtube.com; funciona en producción) |
+| Corrección de duración real desde el reproductor | ✅ | — (requiere red real hacia YouTube) |
 | Efectos (Siren/Airhorn/Laser/Radio) | ✅ | ✅ |
 | Manejo de error de YouTube (101/150/etc.) | ✅ | — (requiere red real hacia YouTube) |

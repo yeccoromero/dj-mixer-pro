@@ -122,6 +122,29 @@ export const DJMixer: React.FC = () => {
     console.log(`Activando efecto: ${effect}`)
   }
 
+  // Once a deck's player reports the video's real duration, replace the placeholder
+  // everywhere it's used: the library entry and, if it's the one currently loaded, the deck.
+  const handleDurationResolved = (trackId: string, duration: number) => {
+    setTracks((prev) => {
+      const index = prev.findIndex((t) => t.id === trackId)
+      if (index === -1 || prev[index].duration === duration) return prev
+      const updated = [...prev]
+      updated[index] = { ...updated[index], duration }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+      return updated
+    })
+    setDeckA((prev) =>
+      prev.track?.id === trackId && prev.track.duration !== duration
+        ? { ...prev, track: { ...prev.track, duration } }
+        : prev,
+    )
+    setDeckB((prev) =>
+      prev.track?.id === trackId && prev.track.duration !== duration
+        ? { ...prev, track: { ...prev.track, duration } }
+        : prev,
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background p-4 space-y-6">
       {/* Header */}
@@ -148,7 +171,14 @@ export const DJMixer: React.FC = () => {
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Deck A */}
         <div className="space-y-4">
-          <Deck id="A" state={deckA} onStateChange={setDeckA} isActive={activeDeck === 'A'} onActivate={() => setActiveDeck('A')} />
+          <Deck
+            id="A"
+            state={deckA}
+            onStateChange={setDeckA}
+            isActive={activeDeck === 'A'}
+            onActivate={() => setActiveDeck('A')}
+            onDurationResolved={handleDurationResolved}
+          />
         </div>
 
         {/* Centro: Cross-fader y CoverFlow */}
@@ -167,7 +197,14 @@ export const DJMixer: React.FC = () => {
 
         {/* Deck B */}
         <div className="space-y-4">
-          <Deck id="B" state={deckB} onStateChange={setDeckB} isActive={activeDeck === 'B'} onActivate={() => setActiveDeck('B')} />
+          <Deck
+            id="B"
+            state={deckB}
+            onStateChange={setDeckB}
+            isActive={activeDeck === 'B'}
+            onActivate={() => setActiveDeck('B')}
+            onDurationResolved={handleDurationResolved}
+          />
         </div>
       </div>
     </div>

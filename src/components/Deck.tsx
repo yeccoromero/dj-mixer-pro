@@ -14,16 +14,38 @@ interface DeckProps {
   onStateChange: React.Dispatch<React.SetStateAction<DeckState>>
   isActive: boolean
   onActivate: () => void
+  /** Called once the real video duration is known, so the app can replace a placeholder. */
+  onDurationResolved?: (trackId: string, duration: number) => void
 }
 
 const accent = { A: 'lime', B: 'aqua' } as const
 
-export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, onActivate }) => {
+export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, onActivate, onDurationResolved }) => {
   const containerId = `yt-player-${id}`
   const playerRef = useRef<YouTubePlayer | null>(null)
   const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const pollRef = useRef<number | null>(null)
+  const lastReportedDuration = useRef<{ trackId: string; duration: number } | null>(null)
+
+  // The player's event handlers below are attached once (see the `[id]`-only effect) and
+  // would otherwise close over a stale `state` forever, so they read from this ref instead.
+  const stateRef = useRef(state)
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
+
+  const reportRealDuration = () => {
+    const track = stateRef.current.track
+    if (!playerRef.current || !track || !onDurationResolved) return
+    const real = Math.round(playerRef.current.getDuration())
+    if (real <= 0 || real === track.duration) return
+    if (lastReportedDuration.current?.trackId === track.id && lastReportedDuration.current.duration === real) {
+      return
+    }
+    lastReportedDuration.current = { trackId: track.id, duration: real }
+    onDurationResolved(track.id, real)
+  }
 
   // Create the YouTube player once per deck.
   useEffect(() => {
@@ -39,12 +61,14 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
             playerRef.current = event.target
             event.target.setVolume(computeEffectiveVolume(state.volume, state.gain))
             setReady(true)
+            reportRealDuration()
           },
           onStateChange: (event) => {
             const YTState = window.YT?.PlayerState
             if (!YTState) return
             if (event.data === YTState.PLAYING) {
               setError(null)
+              reportRealDuration()
               onStateChange((prev) => ({ ...prev, isPlaying: true }))
             } else if (event.data === YTState.PAUSED || event.data === YTState.ENDED) {
               onStateChange((prev) => ({ ...prev, isPlaying: false }))

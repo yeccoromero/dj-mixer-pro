@@ -191,4 +191,38 @@ describe('Deck', () => {
     fireEvent.click(screen.getByText('DECK B'))
     expect(onActivate).toHaveBeenCalled()
   })
+
+  it('reports the real video duration once the player is ready, replacing the placeholder', async () => {
+    mockPlayer.getDuration.mockReturnValue(243)
+    const onDurationResolved = vi.fn()
+    render(
+      <Deck
+        id="A"
+        state={baseState({ track: { ...track, duration: 180 } })}
+        onStateChange={vi.fn()}
+        isActive
+        onActivate={vi.fn()}
+        onDurationResolved={onDurationResolved}
+      />,
+    )
+    await act(async () => {
+      await Promise.resolve()
+    })
+    act(() => capturedEvents.onReady?.({ target: mockPlayer }))
+
+    expect(onDurationResolved).toHaveBeenCalledWith('t1', 243)
+  })
+
+  it('does not report a duration that already matches the track', async () => {
+    mockPlayer.getDuration.mockReturnValue(200) // same as track.duration in baseState()
+    const onDurationResolved = vi.fn()
+    render(
+      <Deck id="A" state={baseState()} onStateChange={vi.fn()} isActive onActivate={vi.fn()} onDurationResolved={onDurationResolved} />,
+    )
+    await act(async () => {
+      await Promise.resolve()
+    })
+    act(() => capturedEvents.onReady?.({ target: mockPlayer }))
+    expect(onDurationResolved).not.toHaveBeenCalled()
+  })
 })

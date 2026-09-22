@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { motion, type PanInfo } from 'framer-motion'
+import { motion, AnimatePresence, type PanInfo } from 'framer-motion'
 import { ChevronLeft, ChevronRight, X, Clock } from 'lucide-react'
 import type { Track } from './DJMixer'
 import { AddTrackModal } from './AddTrackModal'
@@ -14,7 +14,7 @@ interface CoverFlowProps {
   onRemoveTrack: (trackId: string) => void
 }
 
-const STACK_DEPTH = 3 // active card + up to 2 fanned behind it
+const VISIBLE_RADIUS = 2 // show up to 2 cards fanned on each side of the active one
 
 function formatDuration(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60)
@@ -30,18 +30,17 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({
   onAddTrack,
   onRemoveTrack,
 }) => {
-  // The carousel's own position — the single source of truth for what's on top of the
-  // stack. Kept independent of `selectedTrack` so the arrows/swipe always work, even
-  // after a track has been loaded into a deck.
+  // The carousel's own position — the single source of truth for what's centered/active.
+  // Kept independent of `selectedTrack` so the arrows/side cards always work, even after
+  // a track has been loaded into a deck.
   const [centerIndex, setCenterIndex] = useState(0)
 
-  // Keep the index valid as tracks are added/removed.
   useEffect(() => {
     setCenterIndex((i) => Math.min(Math.max(i, 0), Math.max(tracks.length - 1, 0)))
   }, [tracks.length])
 
-  // When a track gets assigned to a deck from elsewhere, bring it to the front of the
-  // stack once — but this never fires again just from browsing with the arrows.
+  // When a track gets assigned to a deck from elsewhere, bring it to the front once —
+  // this never fires again just from browsing with the arrows or side cards.
   useEffect(() => {
     if (!selectedTrack) return
     const idx = tracks.findIndex((t) => t.id === selectedTrack.id)
@@ -69,7 +68,7 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({
     )
   }
 
-  const visibleStack = tracks.slice(centerIndex, centerIndex + STACK_DEPTH)
+  const activeTrack = tracks[centerIndex]
 
   return (
     <div className="panel flex flex-col gap-4 p-5">
@@ -78,7 +77,7 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({
         <AddTrackModal onAddTrack={onAddTrack} />
       </div>
 
-      <div className="relative flex h-64 items-center justify-center">
+      <div className="relative flex h-52 items-center justify-center" style={{ perspective: 900 }}>
         <button
           type="button"
           onClick={() => move(-1)}
@@ -89,27 +88,31 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({
           <ChevronLeft className="h-4 w-4" />
         </button>
 
-        <div className="relative h-56 w-44">
-          {visibleStack
-            .slice()
-            .reverse()
-            .map((track, reverseIndex) => {
-              const depth = visibleStack.length - 1 - reverseIndex // 0 = front/active card
-              const isActive = depth === 0
+        <div className="flex items-center justify-center">
+          <AnimatePresence initial={false}>
+            {tracks.map((track, index) => {
+              const offset = index - centerIndex
+              if (Math.abs(offset) > VISIBLE_RADIUS) return null
+              const isActive = offset === 0
 
               return (
                 <motion.div
                   key={track.id}
-                  className="coverflow-card absolute inset-0 overflow-hidden rounded-2xl border-2 border-white/50 bg-black shadow-lg"
-                  initial={false}
-                  animate={{
-                    x: depth * 16,
-                    y: depth * 10,
-                    scale: 1 - depth * 0.07,
-                    rotate: depth * 3,
-                    opacity: 1 - depth * 0.3,
+                  layout
+                  onClick={() => {
+                    if (!isActive) setCenterIndex(index)
                   }}
-                  style={{ zIndex: 10 - depth, touchAction: 'pan-y' }}
+                  className={cn(
+                    'coverflow-card relative -mx-5 shrink-0 overflow-hidden rounded-2xl border-2 shadow-lg',
+                    isActive ? 'cursor-default border-white/70' : 'cursor-pointer border-white/20',
+                  )}
+                  style={{ width: 128, height: 172, zIndex: 10 - Math.abs(offset) }}
+                  initial={{ opacity: 0 }}
+                  animate={{
+                    opacity: isActive ? 1 : 0.82 - Math.abs(offset) * 0.12,
+                    scale: isActive ? 1.08 : 0.86 - Math.abs(offset) * 0.05,
+                    rotateY: offset * -22,
+                  }}
                   transition={{ type: 'spring', stiffness: 260, damping: 26 }}
                   drag={isActive ? 'x' : false}
                   dragConstraints={{ left: 0, right: 0 }}
@@ -131,21 +134,23 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({
                         event.stopPropagation()
                         onRemoveTrack(track.id)
                       }}
-                      className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-black shadow hover:bg-white"
+                      className="absolute right-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-black shadow hover:bg-white"
                       aria-label={`Quitar "${track.title}" de la biblioteca`}
                       title="Quitar de la biblioteca"
                     >
-                      <X className="h-3.5 w-3.5" />
+                      <X className="h-3 w-3" />
                     </button>
                   )}
 
-                  <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3">
+                  <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1.5 p-2">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-white">{track.title}</p>
-                      <p className="flex items-center gap-1 truncate text-xs text-white/70">
-                        <Clock className="h-3 w-3 shrink-0" />
-                        {track.artist} · {formatDuration(track.duration)}
-                      </p>
+                      <p className="truncate text-xs font-semibold text-white">{track.title}</p>
+                      {isActive && (
+                        <p className="flex items-center gap-1 truncate text-[10px] text-white/70">
+                          <Clock className="h-2.5 w-2.5 shrink-0" />
+                          {track.artist} · {formatDuration(track.duration)}
+                        </p>
+                      )}
                     </div>
                     {isActive && (
                       <button
@@ -155,7 +160,7 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({
                           onTrackSelect(track)
                         }}
                         className={cn(
-                          'w-full rounded-full py-1.5 text-xs font-semibold text-black shadow',
+                          'w-full rounded-full py-1 text-[10px] font-semibold text-black shadow',
                           activeDeck === 'A' ? 'bg-lime-accent' : 'bg-aqua-accent',
                         )}
                         title={`Cargar esta pista en el Deck ${activeDeck} (el deck activo)`}
@@ -167,6 +172,7 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({
                 </motion.div>
               )
             })}
+          </AnimatePresence>
         </div>
 
         <button
@@ -181,7 +187,7 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
-        {centerIndex + 1} / {tracks.length}
+        {activeTrack.title} — {activeTrack.artist}
       </p>
     </div>
   )

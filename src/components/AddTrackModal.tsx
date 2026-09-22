@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Loader2, Plus } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { extractYouTubeId } from '@/lib/youtubeId'
+import { fetchYouTubeOembed } from '@/lib/youtubeOembed'
 import type { Track } from './DJMixer'
 
 interface AddTrackModalProps {
@@ -23,14 +24,33 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack }) => {
   const [title, setTitle] = useState('')
   const [artist, setArtist] = useState('')
   const [duration, setDuration] = useState('180')
+  const [thumbnail, setThumbnail] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [fetchingMeta, setFetchingMeta] = useState(false)
 
   const reset = () => {
     setUrl('')
     setTitle('')
     setArtist('')
     setDuration('180')
+    setThumbnail(null)
     setError(null)
+    setFetchingMeta(false)
+  }
+
+  const handleUrlBlur = async () => {
+    const youtubeId = extractYouTubeId(url)
+    if (!youtubeId) return
+
+    setFetchingMeta(true)
+    const meta = await fetchYouTubeOembed(youtubeId)
+    setFetchingMeta(false)
+    if (!meta) return
+
+    // Only auto-fill fields the user hasn't already typed something into.
+    setTitle((prev) => (prev.trim() ? prev : meta.title))
+    setArtist((prev) => (prev.trim() ? prev : meta.authorName))
+    setThumbnail(meta.thumbnailUrl)
   }
 
   const handleSubmit = (event: React.FormEvent) => {
@@ -47,7 +67,7 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack }) => {
       artist: artist.trim() || 'Artista desconocido',
       youtubeId,
       duration: Number(duration) || 180,
-      thumbnail: `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`,
+      thumbnail: thumbnail ?? `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`,
     })
 
     reset()
@@ -78,13 +98,22 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack }) => {
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
             <Label htmlFor="track-url">URL o ID de YouTube</Label>
-            <input
-              id="track-url"
-              value={url}
-              onChange={(event) => setUrl(event.target.value)}
-              placeholder="https://www.youtube.com/watch?v=..."
-              className="h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-            />
+            <div className="relative">
+              <input
+                id="track-url"
+                value={url}
+                onChange={(event) => setUrl(event.target.value)}
+                onBlur={handleUrlBlur}
+                placeholder="https://www.youtube.com/watch?v=..."
+                className="h-10 w-full rounded-md border border-border bg-background px-3 pr-9 text-sm outline-none focus:ring-2 focus:ring-ring"
+              />
+              {fetchingMeta && (
+                <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Al salir del campo, intentamos completar título y artista automáticamente desde YouTube.
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
