@@ -6,13 +6,14 @@ Un DJ mixer profesional en el navegador construido con React, TypeScript, Tailwi
 
 - **Dos decks (A y B)** con reproducción de YouTube vía la YouTube IFrame API
 - **Crossfader con físicas reales** (GSAP Draggable + inercia) y curva de potencia constante (equal-power), como en un mixer real: clic para saltar, arrastre, y "flick" que desliza y frena solo
-- **Knobs interactivos** (Gain, Filter, Cue point) que giran de verdad con inercia (GSAP), o por teclado, con tooltips explicando cada uno
+- **Knobs interactivos** (Gain, Filter) que giran de verdad con inercia (GSAP), o por teclado, con tooltips explicando cada uno
 - **Reproductor limpio**: sin controles ni interfaz propia de YouTube encima del video, sin captions por defecto; play/pause/cue solo desde la consola de la app
+- **Cue al estilo CDJ**: waveform tocable/arrastrable para buscar el momento, botón MARCAR para guardarlo ahí mismo, y CUE con toque corto (salta y pausa) o mantener presionado (vista previa, vuelve al soltar)
 - **Contador LED de tiempo transcurrido/restante** por deck, en tipografía de matriz de puntos (`DotGothic16`)
 - **Biblioteca en stack de tarjetas** (arrastrable/swipeable) con carátula a pantalla completa, duración visible, y opción de quitar pistas
 - **Modal para agregar pistas** desde cualquier URL o ID de YouTube, con verificación de que el video se pueda reproducir antes de agregarlo
 - **Panel de efectos** (Siren, Airhorn, Laser, Radio) sintetizados con Web Audio API
-- **Waveform simulado** con WaveSurfer.js sincronizado al progreso de reproducción
+- **Waveform interactiva** con WaveSurfer.js, sincronizada al progreso de reproducción y con marca visual del punto de cue
 - **Diseño Music OS**: esquema de color lima/aqua (`#d7ff43`, `#00eec4`) sobre fondo gris claro, con lecturas tipo LED en tipografía de puntos para los contadores
 - **Persistencia local** de la biblioteca de pistas (altas y bajas) vía `localStorage`
 

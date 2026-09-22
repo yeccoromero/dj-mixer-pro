@@ -26,3 +26,13 @@ export function computeCrossfaderVolumes(crossFaderValue: number): { volumeA: nu
 export function computeEffectiveVolume(volume: number, gain: number): number {
   return Math.round((clamp100(volume) / 100) * (clamp100(gain) / 100) * 100)
 }
+
+/**
+ * Converts an absolute playhead position (seconds) into the 0-100% format `DeckState.cue`
+ * stores, so "Marcar" can capture wherever the track actually is right now instead of the
+ * user having to dial in a blind percentage.
+ */
+export function computeCuePercent(currentTime: number, duration: number): number {
+  if (duration <= 0) return 0
+  return clamp100(Math.round((currentTime / duration) * 100))
+}

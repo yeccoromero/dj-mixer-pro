@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clamp100, computeCrossfaderVolumes, computeEffectiveVolume } from './mixerMath'
+import { clamp100, computeCrossfaderVolumes, computeCuePercent, computeEffectiveVolume } from './mixerMath'
 
 describe('clamp100', () => {
   it('leaves in-range values untouched', () => {
@@ -51,5 +51,28 @@ describe('computeEffectiveVolume', () => {
 
   it('multiplies the two inputs proportionally', () => {
     expect(computeEffectiveVolume(50, 50)).toBe(25)
+  })
+})
+
+describe('computeCuePercent', () => {
+  it('converts a playhead position into a percentage of the total duration', () => {
+    expect(computeCuePercent(60, 240)).toBe(25)
+  })
+
+  it('is 0 at the very start', () => {
+    expect(computeCuePercent(0, 240)).toBe(0)
+  })
+
+  it('is 100 at the very end', () => {
+    expect(computeCuePercent(240, 240)).toBe(100)
+  })
+
+  it('returns 0 when duration is unknown (0 or negative)', () => {
+    expect(computeCuePercent(30, 0)).toBe(0)
+    expect(computeCuePercent(30, -10)).toBe(0)
+  })
+
+  it('clamps a time past the end of the track', () => {
+    expect(computeCuePercent(300, 240)).toBe(100)
   })
 })

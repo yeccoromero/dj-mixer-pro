@@ -5,7 +5,7 @@ import type { DeckState } from './DJMixer'
 import { Knob } from './Knob'
 import { WavePanel } from './WavePanel'
 import { loadYouTubeApi, describeYouTubeError, type YouTubePlayer } from '@/lib/youtube'
-import { computeEffectiveVolume } from '@/lib/mixerMath'
+import { computeCuePercent, computeEffectiveVolume } from '@/lib/mixerMath'
 import { formatTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -20,6 +20,10 @@ interface DeckProps {
 }
 
 const accent = { A: 'lime', B: 'aqua' } as const
+// How long the Cue button has to be held before it switches from a "jump back" tap into a
+// "preview from here" hold — long enough that a normal tap never crosses it, short enough
+// that holding still feels immediate.
+const CUE_HOLD_THRESHOLD_MS = 200
 
 export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, onActivate, onDurationResolved }) => {
   const containerId = `yt-player-${id}`
@@ -28,6 +32,7 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
   const [error, setError] = useState<string | null>(null)
   const pollRef = useRef<number | null>(null)
   const lastReportedDuration = useRef<{ trackId: string; duration: number } | null>(null)
+  const [justMarked, setJustMarked] = useState(false)
 
   // The player's event handlers below are attached once (see the `[id]`-only effect) and
   // would otherwise close over a stale `state` forever, so they read from this ref instead.
@@ -35,6 +40,11 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
   useEffect(() => {
     stateRef.current = state
   }, [state])
+
+  const readyRef = useRef(ready)
+  useEffect(() => {
+    readyRef.current = ready
+  }, [ready])
 
   const reportRealDuration = () => {
     const track = stateRef.current.track
@@ -144,10 +154,76 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
     }
   }
 
-  const jumpToCue = () => {
+  /** Seeks the real player AND updates `currentTime` immediately, so the LED counters and
+   * waveform reflect the new position right away — the 400ms poll below only runs while
+   * playing, so without this a seek while paused would look like it silently did nothing. */
+  const seekAndSync = (seconds: number) => {
+    if (!playerRef.current) return
+    playerRef.current.seekTo(seconds, true)
+    onStateChange((prev) => ({ ...prev, currentTime: seconds }))
+  }
+
+  // Reads via refs (not `state`/`ready` directly) so it's safe to call from the mount-only
+  // pointerup listener below, which would otherwise close over stale values forever.
+  const jumpToCueAndStop = () => {
+    const track = stateRef.current.track
+    if (!playerRef.current || !track) return
+    seekAndSync((stateRef.current.cue / 100) * track.duration)
+    playerRef.current.pauseVideo()
+  }
+
+  // Cue behaves like a real CDJ's cue button: a quick tap jumps back to the marked point and
+  // stops there; holding it down previews playback from that point, and releasing snaps back
+  // to the marker and stops again — a single, global `pointerup` listener catches the release
+  // even if the pointer drifted off the button first.
+  const isPressedRef = useRef(false)
+  const isHoldPreviewRef = useRef(false)
+  const holdTimerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const handleGlobalPointerUp = () => {
+      if (!isPressedRef.current) return
+      isPressedRef.current = false
+      if (holdTimerRef.current !== null) {
+        window.clearTimeout(holdTimerRef.current)
+        holdTimerRef.current = null
+      }
+      if (isHoldPreviewRef.current) {
+        isHoldPreviewRef.current = false
+        jumpToCueAndStop()
+      }
+    }
+    window.addEventListener('pointerup', handleGlobalPointerUp)
+    return () => window.removeEventListener('pointerup', handleGlobalPointerUp)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleCuePointerDown = () => {
+    if (!playerRef.current || !readyRef.current || !stateRef.current.track) return
+    isPressedRef.current = true
+    isHoldPreviewRef.current = false
+    jumpToCueAndStop()
+    holdTimerRef.current = window.setTimeout(() => {
+      if (!isPressedRef.current) return
+      isHoldPreviewRef.current = true
+      playerRef.current?.playVideo()
+    }, CUE_HOLD_THRESHOLD_MS)
+  }
+
+  /** "Marcar" grabs wherever the track actually is right now as the new cue point — no
+   * more dialing in a blind percentage, you just mark the moment you're already hearing. */
+  const handleSetCue = () => {
     if (!playerRef.current || !ready || !state.track) return
-    const target = (state.cue / 100) * state.track.duration
-    playerRef.current.seekTo(target, true)
+    const currentTime = playerRef.current.getCurrentTime()
+    const cue = computeCuePercent(currentTime, state.track.duration)
+    onStateChange((prev) => ({ ...prev, cue }))
+    setJustMarked(true)
+    window.setTimeout(() => setJustMarked(false), 400)
+  }
+
+  const handleWaveformSeek = (ratio: number) => {
+    if (!playerRef.current || !ready || !state.track) return
+    seekAndSync(ratio * state.track.duration)
   }
 
   const duration = state.track?.duration ?? 1
@@ -197,7 +273,14 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
         <p className="truncate text-sm text-muted-foreground">{state.track?.artist ?? '—'}</p>
       </div>
 
-      <WavePanel seed={state.track?.id ?? id} progress={progress} isPlaying={state.isPlaying} accent={color} />
+      <WavePanel
+        seed={state.track?.id ?? id}
+        progress={progress}
+        isPlaying={state.isPlaying}
+        accent={color}
+        cueProgress={state.track ? state.cue / 100 : undefined}
+        onSeek={handleWaveformSeek}
+      />
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2" onClick={(event) => event.stopPropagation()}>
         <span className={cn(ledClass, 'justify-self-start text-xs')} title="Tiempo transcurrido">
@@ -220,15 +303,27 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
         </span>
       </div>
 
-      <div className="flex items-center justify-center" onClick={(event) => event.stopPropagation()}>
+      <div className="flex items-center justify-center gap-2" onClick={(event) => event.stopPropagation()}>
         <button
           type="button"
-          disabled={!ready}
-          title="Salta directo al punto guardado en la pista (el knob 'Cue pt.' define cuál) — útil para volver siempre al mismo lugar, como el estribillo"
-          onClick={() => jumpToCue()}
+          disabled={!ready || !state.track}
+          title="Toque corto: salta al punto marcado y para ahí. Mantener presionado: reproduce de prueba desde ese punto; al soltar, vuelve ahí y para."
+          onPointerDown={handleCuePointerDown}
           className="knob flex h-8 w-16 items-center justify-center text-[10px] font-semibold uppercase disabled:cursor-not-allowed disabled:opacity-40"
         >
           Cue
+        </button>
+        <button
+          type="button"
+          disabled={!ready || !state.track}
+          title="Marca el punto exacto donde está la pista ahora mismo como el nuevo cue — se puede tocar o arrastrar la onda para buscar el momento antes de marcarlo"
+          onClick={handleSetCue}
+          className={cn(
+            'knob flex h-8 px-3 items-center justify-center text-[10px] font-semibold uppercase disabled:cursor-not-allowed disabled:opacity-40',
+            justMarked && 'animate-flash-pulse',
+          )}
+        >
+          Marcar
         </button>
       </div>
 
@@ -246,13 +341,6 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
           onChange={(v) => onStateChange((prev) => ({ ...prev, filter: v }))}
           accent={color}
           description="Filtro visual (saturación del video); no afecta el audio del embed de YouTube"
-        />
-        <Knob
-          label="Cue pt."
-          value={state.cue}
-          onChange={(v) => onStateChange((prev) => ({ ...prev, cue: v }))}
-          accent={color}
-          description="Define a qué % de la pista salta el botón 'Cue'"
         />
       </div>
     </motion.div>

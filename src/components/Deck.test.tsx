@@ -3,8 +3,12 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { Deck } from './Deck'
 import type { DeckState, Track } from './DJMixer'
 
+let capturedWavePanelProps: { onSeek?: (ratio: number) => void; cueProgress?: number } | null = null
 vi.mock('./WavePanel', () => ({
-  WavePanel: () => null,
+  WavePanel: (props: { onSeek?: (ratio: number) => void; cueProgress?: number }) => {
+    capturedWavePanelProps = props
+    return null
+  },
 }))
 
 vi.mock('@/lib/youtube', async () => {
@@ -120,16 +124,86 @@ describe('Deck', () => {
     expect(mockPlayer.pauseVideo).toHaveBeenCalled()
   })
 
-  it('Cue button seeks to the cue-point percentage of the track duration', async () => {
-    await renderReadyDeck(baseState({ cue: 25 })) // track.duration = 200 -> 50s
-    fireEvent.click(screen.getByText('Cue'))
+  it('a quick tap on Cue jumps to the marked point and pauses there', async () => {
+    await renderReadyDeck(baseState({ cue: 25, isPlaying: true })) // track.duration = 200 -> 50s
+    const cueButton = screen.getByText('Cue')
+    fireEvent.pointerDown(cueButton)
+    fireEvent.pointerUp(cueButton)
     expect(mockPlayer.seekTo).toHaveBeenCalledWith(50, true)
+    expect(mockPlayer.pauseVideo).toHaveBeenCalled()
   })
 
-  it('does nothing when Play/Cue are clicked before the player is ready', () => {
+  it('does nothing when Play/Cue are used before the player is ready', () => {
     render(<Deck id="A" state={baseState()} onStateChange={vi.fn()} isActive onActivate={vi.fn()} />)
-    fireEvent.click(screen.getByText('Cue'))
+    fireEvent.pointerDown(screen.getByText('Cue'))
+    fireEvent.pointerUp(screen.getByText('Cue'))
     expect(mockPlayer.seekTo).not.toHaveBeenCalled()
+  })
+
+  it('holding Cue past the threshold previews playback from the cue point', async () => {
+    vi.useFakeTimers()
+    await renderReadyDeck(baseState({ cue: 25 })) // 200 * 0.25 = 50s
+    const cueButton = screen.getByText('Cue')
+
+    fireEvent.pointerDown(cueButton)
+    expect(mockPlayer.seekTo).toHaveBeenCalledWith(50, true)
+    expect(mockPlayer.pauseVideo).toHaveBeenCalledTimes(1)
+
+    vi.advanceTimersByTime(250)
+    expect(mockPlayer.playVideo).toHaveBeenCalledTimes(1)
+
+    vi.useRealTimers()
+  })
+
+  it('releasing after a hold-preview jumps back to the cue point and pauses again', async () => {
+    vi.useFakeTimers()
+    await renderReadyDeck(baseState({ cue: 25 }))
+    const cueButton = screen.getByText('Cue')
+
+    fireEvent.pointerDown(cueButton)
+    vi.advanceTimersByTime(250) // crosses the hold threshold, preview starts
+
+    mockPlayer.seekTo.mockClear()
+    mockPlayer.pauseVideo.mockClear()
+    fireEvent.pointerUp(cueButton)
+
+    expect(mockPlayer.seekTo).toHaveBeenCalledWith(50, true)
+    expect(mockPlayer.pauseVideo).toHaveBeenCalledTimes(1)
+
+    vi.useRealTimers()
+  })
+
+  it('a quick tap does not trigger the hold-preview', async () => {
+    vi.useFakeTimers()
+    await renderReadyDeck(baseState({ cue: 25 }))
+    const cueButton = screen.getByText('Cue')
+
+    fireEvent.pointerDown(cueButton)
+    fireEvent.pointerUp(cueButton)
+    mockPlayer.playVideo.mockClear()
+    vi.advanceTimersByTime(250)
+
+    expect(mockPlayer.playVideo).not.toHaveBeenCalled()
+    vi.useRealTimers()
+  })
+
+  it('Marcar captures the current playhead position as the new cue percentage', async () => {
+    mockPlayer.getCurrentTime.mockReturnValue(100) // half of the 200s track
+    const { onStateChange } = await renderReadyDeck(baseState({ cue: 25 }))
+    fireEvent.click(screen.getByText('Marcar'))
+
+    expect(onStateChange).toHaveBeenCalled()
+    const updater = onStateChange.mock.calls[onStateChange.mock.calls.length - 1][0] as (s: DeckState) => DeckState
+    expect(updater(baseState({ cue: 25 })).cue).toBe(50)
+  })
+
+  it('seeking via the waveform moves the real player and updates currentTime immediately', async () => {
+    const { onStateChange } = await renderReadyDeck(baseState())
+    act(() => capturedWavePanelProps?.onSeek?.(0.25))
+
+    expect(mockPlayer.seekTo).toHaveBeenCalledWith(50, true) // 0.25 * 200s
+    const updater = onStateChange.mock.calls[onStateChange.mock.calls.length - 1][0] as (s: DeckState) => DeckState
+    expect(updater(baseState()).currentTime).toBe(50)
   })
 
   it('sets effective volume (crossfader volume x gain) once ready', async () => {

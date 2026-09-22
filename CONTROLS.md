@@ -82,22 +82,31 @@ solo pasan por los botones de este panel, que son los que llaman a `player.playV
 |---|---|---|---|
 | **Cuerpo del deck** (clic en cualquier parte no interactiva) | Marca este deck como el "activo" | `DJMixer.activeDeck` | Determina a qué deck carga la próxima pista con el botón "Cargar en Deck" de `CoverFlow` |
 | **Contador LED (transcurrido) / Botón ▶/⏸ (Play/Pause) / Contador LED (restante)** | Los tres van en una sola fila, con el Play exactamente al centro entre los dos contadores (`grid-cols-[1fr_auto_1fr]`) — es el control principal del deck | El Play toca `DeckState.isPlaying` (lo actualiza el propio evento `onStateChange` del reproductor, no el clic directamente); los contadores solo leen `DeckState.currentTime`/`track.duration`, son informativos | Play deshabilitado hasta que el reproductor emite `onReady` |
-| **Botón CUE** *(más chico, en su propia fila debajo del Play — control secundario; tooltip: "Salta directo al punto guardado en la pista... útil para volver siempre al mismo lugar, como el estribillo")* | Salta la reproducción al punto de cue (`player.seekTo(...)`) | Lee `DeckState.cue` (0–100%) y `track.duration` para calcular el segundo exacto | Deshabilitado hasta `onReady` y si no hay pista asignada |
+| **Waveform** *(ahora interactiva)* | Tocar o arrastrar sobre la onda salta la reproducción a ese punto en vivo, escuchando mientras se explora — reemplaza al viejo knob "Cue pt." como forma de moverse por la pista | `player.seekTo(...)` + `DeckState.currentTime` | `interact: true` en WaveSurfer, evento `interaction` conectado a `player.seekTo`. Muestra además una marca blanca vertical en la posición del cue guardado |
+| **Botón CUE** *(más chico, debajo del Play — control secundario)* | **Toque corto**: salta al punto de cue guardado y pausa ahí (si estaba sonando, corta). **Mantener presionado**: reproduce de prueba desde el cue mientras se sostiene; al soltar, vuelve al cue y pausa de nuevo — igual que el botón Cue de un CDJ real | Lee `DeckState.cue` (0–100%) y `track.duration` para calcular el segundo exacto; `player.seekTo(...)` + `player.pauseVideo()`/`playVideo()` | Deshabilitado hasta `onReady` y si no hay pista asignada. El "soltar" se detecta con un listener global de `pointerup`, así funciona aunque el puntero se mueva fuera del botón antes de soltar |
+| **Botón MARCAR** | Guarda la posición actual de reproducción como el nuevo punto de cue — se escucha el momento exacto (o se busca tocando la waveform) y se marca ahí, en vez de calcular a ciegas un % | `DeckState.cue` (`lib/mixerMath.ts#computeCuePercent`) | Da un flash visual breve de confirmación al tocarlo |
 | **Knob GAIN** *(tooltip: "Ganancia del deck: se combina con el crossfader")* | Se arrastra el disco completo (gira de verdad, con inercia — un giro rápido sigue girando hasta frenar) o se usan las flechas ↑/↓ del teclado | `DeckState.gain` | Se combina con el volumen del crossfader (`computeEffectiveVolume`) y se envía como `player.setVolume(...)`. Arranca al máximo (100), no a la mitad — ver nota de volumen abajo |
 | **Knob FILTER** *(tooltip aclara que es solo visual)* | Igual interacción que Gain | `DeckState.filter` | Aplica un filtro CSS `saturate()` en vivo sobre el video — efecto visual, no de audio (el audio del embed de YouTube no es interceptable) |
-| **Knob CUE PT.** *(tooltip: "Define a qué % de la pista salta el botón 'Cue'")* | Igual interacción | `DeckState.cue` | Define el % del track al que salta el botón CUE |
 
 **Físicas reales del knob (GSAP):** cada knob es un `Draggable` de GSAP (`type: "rotation"`) con
 `InertiaPlugin` — arrastrarlo gira el disco entero (no solo una agujita suelta), y si se suelta con
 velocidad, sigue girando por su cuenta y frena naturalmente en vez de detenerse en seco donde
 soltaste el mouse. Las flechas del teclado siguen funcionando igual que antes (accesibilidad).
 
+**Cue, rehecho para que se sienta natural:** la versión anterior obligaba a calcular a ciegas un
+% de la pista con un knob, sin escuchar nada mientras tanto — nunca se sentía como "marcar el
+momento que estoy escuchando". Ahora el flujo es: tocar o arrastrar la waveform (o simplemente
+reproducir) hasta el momento deseado, tocar **MARCAR** para guardarlo ahí, y usar **CUE** para
+volver — toque corto corta y vuelve al punto; mantener presionado reproduce una vista previa desde
+ahí y, al soltar, vuelve a pausar en el mismo lugar. Se eliminó el knob "Cue pt." — quedó obsoleto
+una vez que marcar el punto en vivo lo reemplaza.
+
 **¿Qué son Gain y Cue, en términos simples?**
 - **Gain** = qué tan fuerte suena ese deck. Se multiplica con la posición del crossfader: si el
   crossfader está del lado del otro deck, aunque el Gain esté al máximo no se va a escuchar nada.
-- **Cue** = un marcador de posición dentro de la pista. El knob "Cue pt." define el %; el botón
-  "Cue" salta ahí instantáneamente (útil para volver siempre al mismo punto, como el "drop" de un
-  tema).
+- **Cue** = un marcador de posición dentro de la pista, como el "drop" o el estribillo. Se guarda
+  con el botón MARCAR (en el punto que se esté escuchando en ese momento) y se vuelve ahí con el
+  botón CUE.
 
 **Bug corregido — el volumen salía más bajo que escuchando el video directo en YouTube:** el
 Gain arrancaba en 50 (mitad), no en 100 (máximo). Como es un atenuador multiplicativo puro
@@ -270,6 +279,10 @@ altas, bajas y correcciones de duración incluidas.
 | Manejo de error de YouTube (101/150/etc.) | ✅ | — (requiere red real hacia YouTube) |
 | Crossfader con curva de potencia constante | ✅ (`mixerMath.test.ts`) | ✅ |
 | Contador LED de tiempo transcurrido/restante | ✅ (`format.test.ts`) | ✅ |
+| Cue: toque corto (salta y pausa) | ✅ (`Deck.test.tsx`) | — (requiere reproductor real; el flujo se confirmó visualmente en navegador) |
+| Cue: mantener presionado (preview) y soltar (vuelve y pausa) | ✅ (`Deck.test.tsx`, timers simulados) | — (requiere reproductor real) |
+| MARCAR (guarda la posición actual como cue) | ✅ (`Deck.test.tsx`, `mixerMath.test.ts`) | — (requiere reproductor real) |
+| Waveform interactiva (tocar/arrastrar para saltar) | ✅ (`Deck.test.tsx`, prop capturada del componente mockeado) | — (requiere reproductor real; se confirmó sin errores de consola en navegador) |
 | CoverFlow — no se cuelga al borrar la tarjeta activa en la última posición | ✅ (test de regresión, confirmado que falla sin el fix) | ✅ |
 | Verificación de reproducibilidad antes de agregar (bloquea videos no embebibles) | ✅ (`AddTrackModal.test.tsx`, chequeo mockeado) | — (requiere red real hacia YouTube; el flujo de "Verificando…" se confirmó en navegador) |
 

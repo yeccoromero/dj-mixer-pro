@@ -6,6 +6,10 @@ interface WavePanelProps {
   progress: number // 0-1
   isPlaying: boolean
   accent?: 'lime' | 'aqua'
+  /** 0-1 position of the saved cue point, drawn as a marker over the waveform. */
+  cueProgress?: number
+  /** Called with a 0-1 ratio when the user clicks or drags on the waveform to seek. */
+  onSeek?: (progress: number) => void
 }
 
 // Deterministic pseudo-random peaks so the same track always renders the same waveform shape.
@@ -25,9 +29,20 @@ function generatePeaks(seed: string, length = 200): number[] {
   return peaks
 }
 
-export const WavePanel: React.FC<WavePanelProps> = ({ seed, progress, isPlaying, accent = 'lime' }) => {
+export const WavePanel: React.FC<WavePanelProps> = ({
+  seed,
+  progress,
+  isPlaying,
+  accent = 'lime',
+  cueProgress,
+  onSeek,
+}) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const wavesurferRef = useRef<WaveSurfer | null>(null)
+  const onSeekRef = useRef(onSeek)
+  useEffect(() => {
+    onSeekRef.current = onSeek
+  }, [onSeek])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -43,11 +58,15 @@ export const WavePanel: React.FC<WavePanelProps> = ({ seed, progress, isPlaying,
       barWidth: 2,
       barGap: 2,
       barRadius: 2,
-      interact: false,
+      interact: true,
     })
 
     wavesurferRef.current = wavesurfer
+    // Loaded against a fixed 1-second duration (fake peaks, no real audio decoding), so
+    // both `seekTo` and the position `interaction` reports back are already 0-1 ratios —
+    // that's what lets clicking/dragging the waveform double as "scrub to find a moment".
     void wavesurfer.load('', [generatePeaks(seed)], 1)
+    wavesurfer.on('interaction', (newTime) => onSeekRef.current?.(newTime))
 
     return () => {
       wavesurfer.destroy()
@@ -59,5 +78,17 @@ export const WavePanel: React.FC<WavePanelProps> = ({ seed, progress, isPlaying,
     wavesurferRef.current?.seekTo(Math.min(1, Math.max(0, progress)))
   }, [progress])
 
-  return <div ref={containerRef} data-playing={isPlaying} aria-hidden="true" />
+  return (
+    <div className="relative">
+      <div ref={containerRef} data-playing={isPlaying} aria-hidden="true" />
+      {typeof cueProgress === 'number' && (
+        <div
+          className="pointer-events-none absolute top-0 h-full w-0.5 -translate-x-1/2 bg-white/90"
+          style={{ left: `${Math.min(100, Math.max(0, cueProgress * 100))}%` }}
+          title="Punto de cue marcado"
+          aria-hidden="true"
+        />
+      )}
+    </div>
+  )
 }
