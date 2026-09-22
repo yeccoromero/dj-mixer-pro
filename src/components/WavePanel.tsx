@@ -1,18 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { cn } from '@/lib/utils'
 
-const PLAYHEAD_TRANSITION_MS = 260
+const FILL_TRANSITION_MS = 260
+const THUMB_TRANSITION = 'width 120ms ease, height 120ms ease, opacity 120ms ease'
+const THIN_HEIGHT = 4
+const EXPANDED_HEIGHT = 6
+const THUMB_SIZE = 12
 
 interface WavePanelProps {
   progress: number // 0-1
   accent?: 'lime' | 'aqua'
-  /** 0-1 position of the saved cue point, drawn as a marker on the track. */
+  /** 0-1 position of the saved cue point, drawn as a small dot on the track. */
   cueProgress?: number
   /** 0-1 fraction of the video actually buffered so far (`player.getVideoLoadedFraction()`),
-   * drawn as a light fill ahead of playback — the same "preload" cue YouTube's own bar
+   * drawn as a gray fill ahead of playback — the same "preload" cue YouTube's own bar
    * shows. Omit to skip the fill entirely. */
   loadedFraction?: number
-  /** False right after an explicit seek (Cue/Marcar), so the line snaps to the new spot
+  /** False right after an explicit seek (Cue/Marcar), so the fill snaps to the new spot
    * instantly instead of gliding there like it does during normal playback. Defaults to
    * true. */
   smoothPlayhead?: boolean
@@ -23,10 +26,11 @@ interface WavePanelProps {
 }
 
 /**
- * The deck's playback-position track: just a plain bar with a colored line marking where
- * the video is, draggable like a normal video player's seek bar. There's no real waveform
- * data available for a YouTube embed, so this deliberately doesn't try to fake one — it's a
- * clean, minimal position indicator instead.
+ * The deck's playback-position bar, styled after YouTube's own seek bar: thin at rest,
+ * a colored fill (not a line) that grows as the video plays, a gray fill showing how much
+ * has buffered, and a round handle that only appears — growing in — on hover or while
+ * dragging. There's no real waveform data available for a YouTube embed, so this
+ * deliberately doesn't try to fake one.
  */
 export const WavePanel: React.FC<WavePanelProps> = ({
   progress,
@@ -42,12 +46,14 @@ export const WavePanel: React.FC<WavePanelProps> = ({
     onSeekRef.current = onSeek
   }, [onSeek])
 
-  // While the user is actively dragging, the line follows the pointer 1:1 in real time
+  // While the user is actively dragging, the fill follows the pointer 1:1 in real time
   // (like a normal video player's seek bar) instead of waiting on `progress` to catch up.
   const [dragPosition, setDragPosition] = useState<number | null>(null)
+  const [isHovered, setIsHovered] = useState(false)
+  const isExpanded = isHovered || dragPosition !== null
 
-  const lineColor = accent === 'lime' ? '#d7ff43' : '#00eec4'
-  const displayedProgress = dragPosition ?? progress
+  const fillColor = accent === 'lime' ? '#d7ff43' : '#00eec4'
+  const displayedProgress = clampPercent(dragPosition ?? progress)
 
   const ratioFromClientX = (clientX: number) => {
     const rect = trackRef.current?.getBoundingClientRect()
@@ -79,45 +85,64 @@ export const WavePanel: React.FC<WavePanelProps> = ({
     window.addEventListener('pointerup', handlePointerUp)
   }
 
+  const fillTransition = smoothPlayhead && dragPosition === null ? `width ${FILL_TRANSITION_MS}ms linear` : 'none'
+
   return (
     <div
-      ref={trackRef}
+      className="flex cursor-pointer touch-none items-center py-2"
       onPointerDown={handleTrackPointerDown}
-      className="relative h-6 cursor-pointer touch-none rounded-full bg-black/10"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      {typeof loadedFraction === 'number' && (
+      <div
+        ref={trackRef}
+        className="relative w-full rounded-full bg-black/10 transition-[height] duration-150"
+        style={{ height: isExpanded ? EXPANDED_HEIGHT : THIN_HEIGHT }}
+      >
+        {typeof loadedFraction === 'number' && (
+          <div
+            className="pointer-events-none absolute inset-y-0 left-0 rounded-full bg-black/25"
+            style={{ width: `${clampPercent(loadedFraction)}%` }}
+            title="Video precargado"
+            aria-hidden="true"
+          />
+        )}
         <div
-          className="pointer-events-none absolute inset-y-0 left-0 rounded-full bg-black/15"
-          style={{ width: `${Math.min(100, Math.max(0, loadedFraction * 100))}%` }}
-          title="Video precargado"
+          className="pointer-events-none absolute inset-y-0 left-0 rounded-full"
+          style={{
+            width: `${displayedProgress}%`,
+            backgroundColor: fillColor,
+            transition: fillTransition,
+          }}
           aria-hidden="true"
         />
-      )}
-      <div
-        className={cn('pointer-events-none absolute top-0 h-full w-0.5 -translate-x-1/2')}
-        style={{
-          left: `${Math.min(100, Math.max(0, displayedProgress * 100))}%`,
-          backgroundColor: lineColor,
-          transition: smoothPlayhead && dragPosition === null ? `left ${PLAYHEAD_TRANSITION_MS}ms linear` : 'none',
-        }}
-        aria-hidden="true"
-      >
-        {/* A small round handle, like a normal video player's seek bar — makes it visually
-            obvious the line is something you can grab and drag, not just a marker. The
-            whole track is draggable either way, not just the handle itself. */}
+        {typeof cueProgress === 'number' && (
+          <div
+            className="pointer-events-none absolute top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-1 ring-black/30"
+            style={{ left: `${clampPercent(cueProgress)}%` }}
+            title="Punto de cue marcado"
+            aria-hidden="true"
+          />
+        )}
+        {/* The handle: invisible and tiny at rest, growing in on hover/drag — same reveal
+            YouTube's own seek bar uses, instead of a marker that's always on screen. */}
         <div
-          className="absolute top-1/2 left-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow"
-          style={{ backgroundColor: lineColor }}
+          className="pointer-events-none absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow"
+          style={{
+            left: `${displayedProgress}%`,
+            backgroundColor: fillColor,
+            width: isExpanded ? THUMB_SIZE : 0,
+            height: isExpanded ? THUMB_SIZE : 0,
+            opacity: isExpanded ? 1 : 0,
+            transition: `left ${fillTransition === 'none' ? '0s' : `${FILL_TRANSITION_MS}ms linear`}, ${THUMB_TRANSITION}`,
+          }}
+          aria-hidden="true"
         />
       </div>
-      {typeof cueProgress === 'number' && (
-        <div
-          className="pointer-events-none absolute top-0 h-full w-0.5 -translate-x-1/2 bg-white/90"
-          style={{ left: `${Math.min(100, Math.max(0, cueProgress * 100))}%` }}
-          title="Punto de cue marcado"
-          aria-hidden="true"
-        />
-      )}
     </div>
   )
+}
+
+function clampPercent(ratio: number) {
+  return Math.min(100, Math.max(0, ratio * 100))
 }
