@@ -187,8 +187,18 @@ real de YouTube intenta cargar el video. Por eso, al enviar el formulario se cre
 `YT.Player` oculto (fuera de pantalla, sin controles) únicamente para observar sus eventos
 `onReady`/`onError`, y se destruye inmediatamente después — es la misma señal que ya usa cada deck,
 solo que ahora se consulta *antes* de agregar la pista a la biblioteca, no después de cargarla en un
-deck. Si no responde en 8 segundos (verificación lenta o colgada), se permite agregar igual en vez
+deck. Si no responde en 10 segundos (verificación lenta o colgada), se permite agregar igual en vez
 de bloquear una pista válida por un problema de red.
+
+**Bug corregido — algunas pistas bloqueadas se agregaban igual:** `onReady` se dispara apenas el
+reproductor en sí queda listo, **no** significa que ese video puntual se pueda incrustar — el
+bloqueo de sello (`onError`, código 101/150) llega por separado, un instante después, una vez que
+YouTube termina de evaluar el permiso de ese video específico. La primera versión resolvía
+"reproducible" apenas veía `onReady`, sin esperar a ver si un `onError` llegaba justo después —
+por eso algunas pistas bloqueadas (como las de UMPG) pasaban el chequeo igual y solo mostraban el
+error real ya cargadas en un deck. Se corrigió dándole a `onError` una ventana de gracia de 2.5s
+después de `onReady` antes de declarar la pista reproducible. Cubierto por un test de regresión
+que reproduce ese orden de eventos exacto y se confirmó que fallaba sin el fix.
 
 **Autocompletado desde la URL original (`lib/youtubeOembed.ts`):** al pegar un link y salir del
 campo, se consulta el endpoint público `oEmbed` de YouTube (`youtube.com/oembed?url=...`) — no
