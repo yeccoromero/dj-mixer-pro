@@ -18,6 +18,10 @@ const VISIBLE_RADIUS = 2 // show up to 2 cards fanned on each side of the active
 const CARD_WIDTH = 128
 const CARD_HEIGHT = 172
 const STEP_X = 84 // horizontal distance each side card slides per position
+// A snappy "decelerate hard" curve (close to GSAP's power3/power4-out) — feels far more
+// fluid for discrete navigation than a spring, which tends to wobble/overshoot when it's
+// animating position, scale and 3D rotation all at once.
+const EASE_OUT_EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1]
 
 function formatDuration(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60)
@@ -116,11 +120,12 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({
                     scale: isActive ? 1.08 : 0.86 - Math.abs(offset) * 0.05,
                     rotateY: offset * -22,
                   }}
-                  exit={{ opacity: 0, scale: 0.7 }}
-                  transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+                  exit={{ opacity: 0, scale: 0.7, transition: { duration: 0.18, ease: EASE_OUT_EXPO } }}
+                  transition={{ duration: 0.32, ease: EASE_OUT_EXPO }}
                   drag={isActive ? 'x' : false}
                   dragConstraints={{ left: 0, right: 0 }}
-                  dragElastic={0.6}
+                  dragElastic={0.5}
+                  dragTransition={{ bounceStiffness: 500, bounceDamping: 32 }}
                   onDragEnd={isActive ? handleDragEnd : undefined}
                 >
                   <img

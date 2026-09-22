@@ -94,16 +94,12 @@
     @apply bg-aqua-accent text-accent-foreground px-3 py-1 rounded-full text-sm font-medium;
   }
 
+  /* Transform is fully driven by Framer Motion's `animate` prop (see CoverFlow.tsx) — no
+     CSS transition here, since a `transition: all` on an element whose transform is being
+     updated every frame by JS makes the browser chase each intermediate value with its own
+     300ms transition, compounding into visibly slow, laggy motion. */
   .coverflow-card {
-    @apply transition-all duration-300 transform-gpu;
-  }
-
-  .coverflow-card.active {
-    @apply scale-105 z-10;
-  }
-
-  .coverflow-card.side {
-    @apply scale-95 opacity-80;
+    @apply transform-gpu;
   }
 }
 
