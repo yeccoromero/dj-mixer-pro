@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractYouTubeId } from './youtubeId'
+import { extractYouTubeId, isYouTubeShortsUrl } from './youtubeId'
 
 describe('extractYouTubeId', () => {
   it('accepts a bare 11-character video ID', () => {
@@ -46,5 +46,27 @@ describe('extractYouTubeId', () => {
 
   it('rejects a URL from an unrelated domain with no video id', () => {
     expect(extractYouTubeId('https://example.com/watch?v=dQw4w9WgXcQextra')).toBeNull()
+  })
+})
+
+describe('isYouTubeShortsUrl', () => {
+  it('flags a /shorts/ link', () => {
+    expect(isYouTubeShortsUrl('https://www.youtube.com/shorts/dQw4w9WgXcQ')).toBe(true)
+  })
+
+  it('does not flag a regular watch URL', () => {
+    expect(isYouTubeShortsUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe(false)
+  })
+
+  it('does not flag a youtu.be link', () => {
+    expect(isYouTubeShortsUrl('https://youtu.be/dQw4w9WgXcQ')).toBe(false)
+  })
+
+  it('does not flag a bare ID (no way to tell from an ID alone)', () => {
+    expect(isYouTubeShortsUrl('dQw4w9WgXcQ')).toBe(false)
+  })
+
+  it('does not throw on garbage input', () => {
+    expect(isYouTubeShortsUrl('not a url')).toBe(false)
   })
 })

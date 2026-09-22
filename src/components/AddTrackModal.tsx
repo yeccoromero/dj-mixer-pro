@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { extractYouTubeId } from '@/lib/youtubeId'
+import { extractYouTubeId, isYouTubeShortsUrl } from '@/lib/youtubeId'
 import { fetchYouTubeOembed } from '@/lib/youtubeOembed'
 import { checkVideoEmbeddable } from '@/lib/youtubeEmbedCheck'
 import type { Track } from './DJMixer'
@@ -61,6 +61,15 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack }) => {
     const youtubeId = extractYouTubeId(url)
     if (!youtubeId) {
       setError('Pega una URL o ID de YouTube válido')
+      return
+    }
+
+    if (isYouTubeShortsUrl(url)) {
+      setError(
+        'Los YouTube Shorts no se pueden mostrar limpios: YouTube les agrega su propia interfaz ' +
+          '(título, avatar, compartir, subtítulos) que no se puede quitar. Buscá el video en su ' +
+          'versión larga y pegá ese link.',
+      )
       return
     }
 

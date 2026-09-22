@@ -91,6 +91,22 @@ describe('AddTrackModal', () => {
     expect(screen.getByLabelText('URL o ID de YouTube')).toHaveValue('https://www.youtube.com/watch?v=dQw4w9WgXcQ')
   })
 
+  it('blocks a /shorts/ link — YouTube forces its own overlay on Shorts that cannot be stripped', async () => {
+    const onAddTrack = vi.fn()
+    render(<AddTrackModal onAddTrack={onAddTrack} />)
+
+    fireEvent.click(screen.getByText('Agregar pista'))
+    fireEvent.change(screen.getByLabelText('URL o ID de YouTube'), {
+      target: { value: 'https://www.youtube.com/shorts/dQw4w9WgXcQ' },
+    })
+    fireEvent.click(screen.getByText('Añadir a la biblioteca'))
+
+    expect(screen.getByText(/Los YouTube Shorts no se pueden mostrar limpios/)).toBeInTheDocument()
+    expect(onAddTrack).not.toHaveBeenCalled()
+    // Never even reaches the embeddability check — Shorts fail for a different reason.
+    expect(checkVideoEmbeddable).not.toHaveBeenCalled()
+  })
+
   it('auto-fills title/artist from YouTube oEmbed when the URL field loses focus', async () => {
     vi.mocked(fetchYouTubeOembed).mockResolvedValue({
       title: 'Never Gonna Give You Up',

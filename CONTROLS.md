@@ -187,7 +187,19 @@ borrarla, verificar que no explota).
 |---|---|
 | **Campo "URL o ID de YouTube"** | Acepta un ID de 11 caracteres, una URL completa (`youtube.com/watch?v=`), un link corto (`youtu.be/`) o un link de Shorts. Se valida con `lib/youtubeId.ts#extractYouTubeId`, que **rechaza** cualquier cosa que no matchee el patrón exacto de un ID de YouTube (evita inyectar valores arbitrarios en la URL del thumbnail o en el reproductor). Al salir del campo (`onBlur`), dispara la búsqueda automática de metadatos (ver abajo) |
 | **Campos Título / Artista / Duración** | Se autocompletan desde YouTube si es posible (ver abajo); si quedan vacíos al enviar, se usan valores por defecto ("Pista sin título", "Artista desconocido", 180s). Editable en cualquier momento — lo que ya escribiste a mano nunca se sobrescribe |
-| **Botón "Añadir a la biblioteca"** | Valida el formato del link; si es inválido muestra un error inline. Si el formato es válido, antes de agregarla **verifica que el video realmente se pueda reproducir aquí** (ver abajo); mientras verifica, el botón cambia a "Verificando que se pueda reproducir…" y queda deshabilitado. Si pasa la verificación, construye un `Track`, llama `onAddTrack(track)`, cierra el modal y limpia el formulario. Si no pasa, muestra el motivo exacto y el modal queda abierto con los datos intactos para probar otro link |
+| **Botón "Añadir a la biblioteca"** | Valida el formato del link; si es inválido muestra un error inline. Si es un link de YouTube Shorts, lo rechaza de entrada (ver abajo). Si el formato es válido, antes de agregarla **verifica que el video realmente se pueda reproducir aquí** (ver abajo); mientras verifica, el botón cambia a "Verificando que se pueda reproducir…" y queda deshabilitado. Si pasa la verificación, construye un `Track`, llama `onAddTrack(track)`, cierra el modal y limpia el formulario. Si no pasa, muestra el motivo exacto y el modal queda abierto con los datos intactos para probar otro link |
+
+**Los links de YouTube Shorts se rechazan (`lib/youtubeId.ts#isYouTubeShortsUrl`):** YouTube sirve
+los Shorts, incluso a través de la IFrame API oficial, con su propia interfaz obligatoria
+encima del video (título, avatar del canal, botón de compartir, subtítulos, el logo de
+YouTube) — esa interfaz **no** es parte de la barra de controles normal que ya se puede ocultar
+(`controls: 0`, etc.); viene incorporada al formato de embed que YouTube exige para los Shorts, y
+ningún parámetro del lado del cliente la puede quitar. Como el pedido explícito es que el
+reproductor se vea limpio y se controle solo desde la consola de la app, un link `/shorts/` se
+bloquea directamente al intentar agregarlo, con un mensaje explicando por qué y sugiriendo pegar
+la versión larga del video si existe. Esto solo detecta el link `/shorts/` en sí — un video
+agregado por su URL normal (`watch?v=`) que YouTube también clasifique internamente como Short
+puede seguir mostrando esa interfaz, ya que no hay forma de saberlo de antemano sin cargarlo.
 
 **Verificación de reproducibilidad antes de agregar (`lib/youtubeEmbedCheck.ts`):** el endpoint
 `oEmbed` (usado para autocompletar) solo refleja el interruptor "permitir incrustar" del video — no

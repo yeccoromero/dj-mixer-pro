@@ -32,3 +32,22 @@ export function extractYouTubeId(input: string): string | null {
 
   return candidate && YOUTUBE_ID_PATTERN.test(candidate) ? candidate : null
 }
+
+/**
+ * True when the raw input is specifically a /shorts/ link. YouTube serves Shorts through
+ * ANY embed method — including the official IFrame API used here — wrapped in its own
+ * mandatory overlay (title, channel avatar, share button, captions, YouTube branding) that
+ * `playerVars` like `controls`/`modestbranding`/`iv_load_policy` cannot suppress; it isn't
+ * part of the normal player chrome, it's baked into the required Shorts embed template. So
+ * a Short can never be shown as a clean, console-only video here — this flags that case
+ * before it's added, instead of surprising the user with it after.
+ */
+export function isYouTubeShortsUrl(input: string): boolean {
+  const trimmed = input.trim()
+  try {
+    const url = new URL(trimmed)
+    return /\/shorts\/[\w-]{11}/.test(url.pathname)
+  } catch {
+    return false
+  }
+}
