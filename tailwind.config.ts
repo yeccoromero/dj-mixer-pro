@@ -64,16 +64,10 @@ export default {
           from: { opacity: '0', transform: 'translateY(6px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
-        'beat-pulse': {
-          '0%': { boxShadow: '0 0 0 0 var(--beat-pulse-color, rgba(215,255,67,0.6))' },
-          '70%': { boxShadow: '0 0 0 10px rgba(215,255,67,0)' },
-          '100%': { boxShadow: '0 0 0 0 rgba(215,255,67,0)' },
-        },
       },
       animation: {
         'flash-pulse': 'flash-pulse 0.4s ease-in-out',
         'slide-in': 'slide-in 0.2s ease-out',
-        'beat-pulse': 'beat-pulse 0.6s ease-out infinite',
       },
     },
   },

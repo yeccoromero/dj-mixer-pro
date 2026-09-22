@@ -81,11 +81,10 @@ solo pasan por los botones de este panel, que son los que llaman a `player.playV
 | Control | Qué hace | Estado que toca | Notas |
 |---|---|---|---|
 | **Cuerpo del deck** (clic en cualquier parte no interactiva) | Marca este deck como el "activo" | `DJMixer.activeDeck` | Determina a qué deck carga la próxima pista con el botón "Cargar en Deck" de `CoverFlow` |
-| **Botón ▶/⏸ (Play/Pause)** | Reproduce o pausa el video de YouTube (`player.playVideo()` / `player.pauseVideo()`) | `DeckState.isPlaying` (lo actualiza el propio evento `onStateChange` del reproductor, no el clic directamente) | Deshabilitado hasta que el reproductor emite `onReady` |
-| **Botón CUE** *(tooltip: "Salta la reproducción al punto marcado por 'Cue pt.'")* | Salta la reproducción al punto de cue (`player.seekTo(...)`) | Lee `DeckState.cue` (0–100%) y `track.duration` para calcular el segundo exacto | Deshabilitado hasta `onReady` y si no hay pista asignada |
+| **Botón ▶/⏸ (Play/Pause)** *(solo, centrado, el control principal del deck)* | Reproduce o pausa el video de YouTube (`player.playVideo()` / `player.pauseVideo()`) | `DeckState.isPlaying` (lo actualiza el propio evento `onStateChange` del reproductor, no el clic directamente) | Deshabilitado hasta que el reproductor emite `onReady` |
+| **Botón CUE** *(más chico, debajo del Play — control secundario; tooltip: "Salta la reproducción al punto marcado por 'Cue pt.'")* | Salta la reproducción al punto de cue (`player.seekTo(...)`) | Lee `DeckState.cue` (0–100%) y `track.duration` para calcular el segundo exacto | Deshabilitado hasta `onReady` y si no hay pista asignada |
 | **Contador LED (transcurrido / restante)** | Muestra `tiempo transcurrido` y `-tiempo restante` en vivo, en la tipografía de puntos (`lib/format.ts#formatTime`) | Lee `DeckState.currentTime` y `track.duration` | Puramente informativo, no interactivo |
-| **Botón TAP + lectura BPM** *(tooltip explica el gesto)* | Cada clic registra una marca de tiempo; con 2 o más marcas cercanas entre sí, calcula el BPM promedio (`lib/bpm.ts#registerTap`) | Estado local del deck (`bpm`), no viaja a `DJMixer` | Un silencio de más de 2s entre toques reinicia la lectura; cambiar de pista también la reinicia. Mientras el BPM está definido y la pista suena, el botón Play emite un pulso visual (anillo) sincronizado a ese tempo — ayuda a mezclar a oído sin depender de ningún audio real, ya que YouTube no expone su señal para análisis |
-| **Knob GAIN** *(tooltip: "Ganancia del deck: se combina con el crossfader")* | Se arrastra el disco completo (gira de verdad, con inercia — un giro rápido sigue girando hasta frenar) o se usan las flechas ↑/↓ del teclado | `DeckState.gain` | Se combina con el volumen del crossfader (`computeEffectiveVolume`) y se envía como `player.setVolume(...)` |
+| **Knob GAIN** *(tooltip: "Ganancia del deck: se combina con el crossfader")* | Se arrastra el disco completo (gira de verdad, con inercia — un giro rápido sigue girando hasta frenar) o se usan las flechas ↑/↓ del teclado | `DeckState.gain` | Se combina con el volumen del crossfader (`computeEffectiveVolume`) y se envía como `player.setVolume(...)`. Arranca al máximo (100), no a la mitad — ver nota de volumen abajo |
 | **Knob FILTER** *(tooltip aclara que es solo visual)* | Igual interacción que Gain | `DeckState.filter` | Aplica un filtro CSS `saturate()` en vivo sobre el video — efecto visual, no de audio (el audio del embed de YouTube no es interceptable) |
 | **Knob CUE PT.** *(tooltip: "Define a qué % de la pista salta el botón 'Cue'")* | Igual interacción | `DeckState.cue` | Define el % del track al que salta el botón CUE |
 
@@ -94,12 +93,22 @@ solo pasan por los botones de este panel, que son los que llaman a `player.playV
 velocidad, sigue girando por su cuenta y frena naturalmente en vez de detenerse en seco donde
 soltaste el mouse. Las flechas del teclado siguen funcionando igual que antes (accesibilidad).
 
-**¿Qué son Gain y Cue, en criollo?**
+**¿Qué son Gain y Cue, en términos simples?**
 - **Gain** = qué tan fuerte suena ese deck. Se multiplica con la posición del crossfader: si el
-  crossfader está del lado del otro deck, aunque subas el Gain al máximo no vas a escuchar nada.
+  crossfader está del lado del otro deck, aunque el Gain esté al máximo no se va a escuchar nada.
 - **Cue** = un marcador de posición dentro de la pista. El knob "Cue pt." define el %; el botón
   "Cue" salta ahí instantáneamente (útil para volver siempre al mismo punto, como el "drop" de un
   tema).
+
+**Bug corregido — el volumen salía más bajo que escuchando el video directo en YouTube:** el
+Gain arrancaba en 50 (mitad), no en 100 (máximo). Como es un atenuador multiplicativo puro
+(`(volumen_crossfader/100) × (gain/100) × 100`, ver abajo) y no un control tipo "unity gain" de
+mixer real (donde el centro suele ser "0dB, sin cambio"), dejarlo en 50 por defecto silenciaba
+cada deck a la mitad sin que se notara por qué — sonaba bajo desde el primer track agregado,
+antes de tocar ningún knob. Se corrigió el valor inicial de Gain a 100. El techo real de volumen
+sigue siendo el mismo que YouTube (`player.setVolume` tope en 100, no hay forma de superarlo vía
+la IFrame API) — con Gain al máximo y el crossfader empujado del todo hacia ese deck, el volumen
+iguala exactamente al de reproducir el video directo en YouTube.
 
 **Conexión con el crossfader:** el volumen que cada deck realmente aplica al reproductor es
 `computeEffectiveVolume(volumen_por_crossfader, gain)` (ver `lib/mixerMath.ts`), o sea
@@ -260,7 +269,6 @@ altas, bajas y correcciones de duración incluidas.
 | Corrección de duración real desde el reproductor | ✅ | — (requiere red real hacia YouTube) |
 | Efectos (Siren/Airhorn/Laser/Radio) | ✅ | ✅ |
 | Manejo de error de YouTube (101/150/etc.) | ✅ | — (requiere red real hacia YouTube) |
-| Tap-tempo BPM (registro, reinicio por pista/silencio) | ✅ (`bpm.test.ts`, `Deck.test.tsx`) | ✅ |
 | Crossfader con curva de potencia constante | ✅ (`mixerMath.test.ts`) | ✅ |
 | Contador LED de tiempo transcurrido/restante | ✅ (`format.test.ts`) | ✅ |
 | CoverFlow — no se cuelga al borrar la tarjeta activa en la última posición | ✅ (test de regresión, confirmado que falla sin el fix) | ✅ |
@@ -268,9 +276,9 @@ altas, bajas y correcciones de duración incluidas.
 
 ---
 
-## Tipografía LED (BPM y contadores)
+## Tipografía LED (contadores)
 
-Los valores numéricos "en vivo" (BPM, tiempo transcurrido/restante) usan una fuente de matriz de
+Los valores numéricos "en vivo" (tiempo transcurrido/restante) usan una fuente de matriz de
 puntos (`DotGothic16`, clase `.font-led` en `index.css`) sobre un panel negro con resplandor de
 color (`.led-display-lime` / `.led-display-aqua`), inspirados en las pantallas LED de un mixer de
 hardware real. El resto de la interfaz sigue usando Inter/Space Grotesk — la fuente de puntos se

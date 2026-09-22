@@ -107,16 +107,16 @@ describe('Deck', () => {
 
   it('Play button calls playVideo() when paused', async () => {
     await renderReadyDeck(baseState({ isPlaying: false }))
-    // The icon-only play/pause button is the second button rendered (Cue, then Play).
+    // The icon-only play/pause button is the first button rendered (Play, then Cue below it).
     const buttons = screen.getAllByRole('button')
-    fireEvent.click(buttons[1])
+    fireEvent.click(buttons[0])
     expect(mockPlayer.playVideo).toHaveBeenCalled()
   })
 
   it('Play/Pause button calls pauseVideo() when playing', async () => {
     await renderReadyDeck(baseState({ isPlaying: true }))
     const buttons = screen.getAllByRole('button')
-    fireEvent.click(buttons[1])
+    fireEvent.click(buttons[0])
     expect(mockPlayer.pauseVideo).toHaveBeenCalled()
   })
 
@@ -211,46 +211,6 @@ describe('Deck', () => {
     act(() => capturedEvents.onReady?.({ target: mockPlayer }))
 
     expect(onDurationResolved).toHaveBeenCalledWith('t1', 243)
-  })
-
-  it('estimates and displays BPM from repeated taps on the Tap button', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] })
-    await renderReadyDeck()
-    const tapButton = screen.getByText('Tap')
-
-    expect(screen.getByText('-- BPM')).toBeInTheDocument()
-
-    vi.setSystemTime(0)
-    fireEvent.click(tapButton)
-    vi.setSystemTime(500) // 500ms apart = 120 BPM
-    fireEvent.click(tapButton)
-
-    expect(screen.getByText('120 BPM')).toBeInTheDocument()
-    vi.useRealTimers()
-  })
-
-  it('resets the tap-tempo reading when a new track is assigned', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] })
-    const { rerender } = render(
-      <Deck id="A" state={baseState()} onStateChange={vi.fn()} isActive onActivate={vi.fn()} />,
-    )
-    await act(async () => {
-      await Promise.resolve()
-    })
-    act(() => capturedEvents.onReady?.({ target: mockPlayer }))
-
-    const tapButton = screen.getByText('Tap')
-    vi.setSystemTime(0)
-    fireEvent.click(tapButton)
-    vi.setSystemTime(500)
-    fireEvent.click(tapButton)
-    expect(screen.getByText('120 BPM')).toBeInTheDocument()
-
-    const newTrack: Track = { ...track, id: 't2', youtubeId: 'abcdefghijk' }
-    rerender(<Deck id="A" state={baseState({ track: newTrack })} onStateChange={vi.fn()} isActive onActivate={vi.fn()} />)
-
-    expect(screen.getByText('-- BPM')).toBeInTheDocument()
-    vi.useRealTimers()
   })
 
   it('does not report a duration that already matches the track', async () => {

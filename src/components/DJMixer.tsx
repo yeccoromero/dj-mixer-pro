@@ -60,7 +60,12 @@ const createInitialDeckState = (track: Track | null): DeckState => ({
   isPlaying: false,
   currentTime: 0,
   volume: 50,
-  gain: 50,
+  // Gain defaults to full (unity) send, not half — it's a straight 0-100% attenuator here
+  // (see computeEffectiveVolume), so starting it at 50 made every deck sound noticeably
+  // quieter than the same video played directly on YouTube until the user found and raised
+  // this knob. Starting at 100 matches YouTube's own volume once the crossfader favors
+  // this deck; the knob can still be pulled down from there like any real gain trim.
+  gain: 100,
   filter: 50,
   cue: 0,
   track,

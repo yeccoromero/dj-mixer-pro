@@ -7,13 +7,13 @@ Un DJ mixer profesional en el navegador construido con React, TypeScript, Tailwi
 - **Dos decks (A y B)** con reproducción de YouTube vía la YouTube IFrame API
 - **Crossfader con físicas reales** (GSAP Draggable + inercia) y curva de potencia constante (equal-power), como en un mixer real: clic para saltar, arrastre, y "flick" que desliza y frena solo
 - **Knobs interactivos** (Gain, Filter, Cue point) que giran de verdad con inercia (GSAP), o por teclado, con tooltips explicando cada uno
-- **Tap-tempo BPM por deck** con lectura en pantalla LED y pulso visual en el botón Play sincronizado al tempo detectado
+- **Reproductor limpio**: sin controles ni interfaz propia de YouTube encima del video, sin captions por defecto; play/pause/cue solo desde la consola de la app
 - **Contador LED de tiempo transcurrido/restante** por deck, en tipografía de matriz de puntos (`DotGothic16`)
 - **Biblioteca en stack de tarjetas** (arrastrable/swipeable) con carátula a pantalla completa, duración visible, y opción de quitar pistas
-- **Modal para agregar pistas** desde cualquier URL o ID de YouTube
+- **Modal para agregar pistas** desde cualquier URL o ID de YouTube, con verificación de que el video se pueda reproducir antes de agregarlo
 - **Panel de efectos** (Siren, Airhorn, Laser, Radio) sintetizados con Web Audio API
 - **Waveform simulado** con WaveSurfer.js sincronizado al progreso de reproducción
-- **Diseño Music OS**: esquema de color lima/aqua (`#d7ff43`, `#00eec4`) sobre fondo gris claro, con lecturas tipo LED en tipografía de puntos para BPM y contadores
+- **Diseño Music OS**: esquema de color lima/aqua (`#d7ff43`, `#00eec4`) sobre fondo gris claro, con lecturas tipo LED en tipografía de puntos para los contadores
 - **Persistencia local** de la biblioteca de pistas (altas y bajas) vía `localStorage`
 
 ## Stack
@@ -44,7 +44,7 @@ src/
 │   ├── Knob.tsx          # Knob circular personalizado
 │   ├── EffectsPanel.tsx  # Panel de efectos DJ
 │   └── WavePanel.tsx     # Waveform con WaveSurfer
-├── lib/                  # Utilidades (YouTube API, efectos de audio, matemática del mixer, tap-tempo BPM, formato de tiempo)
+├── lib/                  # Utilidades (YouTube API, efectos de audio, matemática del mixer, formato de tiempo)
 ├── pages/Index.tsx       # Página principal
 └── index.css             # Sistema de diseño Music OS
 ```
