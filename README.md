@@ -8,18 +8,18 @@ Un DJ mixer profesional en el navegador construido con React, TypeScript, Tailwi
 - **Crossfader con físicas reales** (GSAP Draggable + inercia) y curva de potencia constante (equal-power), como en un mixer real: clic para saltar, arrastre, y "flick" que desliza y frena solo
 - **Knobs interactivos** (Gain, Filter) que giran de verdad con inercia (GSAP), o por teclado, con tooltips explicando cada uno
 - **Reproductor limpio**: sin controles ni interfaz propia de YouTube encima del video, sin captions por defecto; play/pause/cue solo desde la consola de la app
-- **Cue al estilo CDJ**: waveform tocable/arrastrable para buscar el momento, botón MARCAR para guardarlo ahí mismo, y CUE con toque corto (salta y pausa) o mantener presionado (vista previa, vuelve al soltar)
+- **Cue al estilo CDJ**: barra de posición tocable/arrastrable (como el buscador de YouTube) para buscar el momento, botón MARCAR para guardarlo ahí mismo, y CUE con toque corto (salta y pausa) o mantener presionado (vista previa, vuelve al soltar)
 - **Contador LED de tiempo transcurrido/restante** por deck, en tipografía de matriz de puntos (`DotGothic16`)
 - **Biblioteca en stack de tarjetas** (arrastrable/swipeable) con carátula a pantalla completa, duración visible, y opción de quitar pistas
 - **Modal para agregar pistas** desde cualquier URL o ID de YouTube, con verificación de que el video se pueda reproducir antes de agregarlo
 - **Panel de efectos** (Siren, Airhorn, Laser, Radio) sintetizados con Web Audio API
-- **Waveform interactiva** con WaveSurfer.js, sincronizada al progreso de reproducción y con marca visual del punto de cue
+- **Barra de posición minimalista**: una línea en el color del deck (no una onda falsa) marca el avance y se puede arrastrar para adelantar/retroceder, con una marca aparte para el punto de cue
 - **Diseño Music OS**: esquema de color lima/aqua (`#d7ff43`, `#00eec4`) sobre fondo gris claro, con lecturas tipo LED en tipografía de puntos para los contadores
 - **Persistencia local** de la biblioteca de pistas (altas y bajas) vía `localStorage`
 
 ## Stack
 
-React 19 · TypeScript · Vite · Tailwind CSS 3 · Framer Motion · GSAP (Draggable + InertiaPlugin) · Radix UI · WaveSurfer.js · lucide-react
+React 19 · TypeScript · Vite · Tailwind CSS 3 · Framer Motion · GSAP (Draggable + InertiaPlugin) · Radix UI · lucide-react
 
 ## Desarrollo
 
@@ -44,7 +44,7 @@ src/
 │   ├── AddTrackModal.tsx # Modal para agregar tracks
 │   ├── Knob.tsx          # Knob circular personalizado
 │   ├── EffectsPanel.tsx  # Panel de efectos DJ
-│   └── WavePanel.tsx     # Waveform con WaveSurfer
+│   └── WavePanel.tsx     # Barra de posición arrastrable (sin waveform)
 ├── lib/                  # Utilidades (YouTube API, efectos de audio, matemática del mixer, formato de tiempo)
 ├── pages/Index.tsx       # Página principal
 └── index.css             # Sistema de diseño Music OS

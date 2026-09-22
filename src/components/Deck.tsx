@@ -287,9 +287,7 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
       </div>
 
       <WavePanel
-        seed={state.track?.id ?? id}
         progress={progress}
-        isPlaying={state.isPlaying}
         accent={color}
         cueProgress={state.track ? state.cue / 100 : undefined}
         smoothPlayhead={smoothPlayhead}

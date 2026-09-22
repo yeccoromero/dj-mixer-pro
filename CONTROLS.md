@@ -82,9 +82,9 @@ solo pasan por los botones de este panel, que son los que llaman a `player.playV
 |---|---|---|---|
 | **Cuerpo del deck** (clic en cualquier parte no interactiva) | Marca este deck como el "activo" | `DJMixer.activeDeck` | Determina a qué deck carga la próxima pista con el botón "Cargar en Deck" de `CoverFlow` |
 | **Contador LED (transcurrido) / Botón ▶/⏸ (Play/Pause) / Contador LED (restante)** | Los tres van en una sola fila, con el Play exactamente al centro entre los dos contadores (`grid-cols-[1fr_auto_1fr]`) — es el control principal del deck | El Play toca `DeckState.isPlaying` (lo actualiza el propio evento `onStateChange` del reproductor, no el clic directamente); los contadores solo leen `DeckState.currentTime`/`track.duration`, son informativos | Play deshabilitado hasta que el reproductor emite `onReady` |
-| **Waveform** *(ahora interactiva, como el buscador de YouTube)* | Tocar la onda salta a ese punto; **arrastrar** (con el mouse o el dedo) mueve el avance en vivo mientras se sostiene, igual que la barra de progreso de YouTube — la línea con la manija circular sigue el puntero al instante | `player.seekTo(...)` + `DeckState.currentTime` | `interact: true` + `dragToSeek: true` en WaveSurfer (esto último faltaba y era lo que impedía arrastrar). Muestra además una marca blanca vertical en la posición del cue guardado |
+| **Barra de posición** *(`WavePanel.tsx`, sin forma de onda — solo una línea)* | Tocar salta a ese punto; **arrastrar** (mouse o dedo) mueve el avance en vivo mientras se sostiene, igual que la barra de progreso de YouTube — la línea con la manija circular, en el color del deck (lima/aqua), sigue el puntero al instante | `player.seekTo(...)` + `DeckState.currentTime` | Pensada para ser mínima a propósito: no hay datos reales de audio de un video de YouTube para dibujar una onda de verdad, así que en vez de fingir una, es solo la barra + la línea. Muestra además una marca blanca vertical en la posición del cue guardado |
 | **Botón CUE** *(más chico, debajo del Play — control secundario)* | **Toque corto**: salta al punto de cue guardado y pausa ahí (si estaba sonando, corta). **Mantener presionado**: reproduce de prueba desde el cue mientras se sostiene; al soltar, vuelve al cue y pausa de nuevo — igual que el botón Cue de un CDJ real | Lee `DeckState.cue` (0–100%) y `track.duration` para calcular el segundo exacto; `player.seekTo(...)` + `player.pauseVideo()`/`playVideo()` | Deshabilitado hasta `onReady` y si no hay pista asignada. El "soltar" se detecta con un listener global de `pointerup`, así funciona aunque el puntero se mueva fuera del botón antes de soltar |
-| **Botón MARCAR** | Guarda la posición actual de reproducción como el nuevo punto de cue — se escucha el momento exacto (o se busca tocando la waveform) y se marca ahí, en vez de calcular a ciegas un % | `DeckState.cue` (`lib/mixerMath.ts#computeCuePercent`) | Da un flash visual breve de confirmación al tocarlo |
+| **Botón MARCAR** | Guarda la posición actual de reproducción como el nuevo punto de cue — se escucha el momento exacto (o se busca arrastrando la barra) y se marca ahí, en vez de calcular a ciegas un % | `DeckState.cue` (`lib/mixerMath.ts#computeCuePercent`) | Da un flash visual breve de confirmación al tocarlo |
 | **Knob GAIN** *(tooltip: "Ganancia del deck: se combina con el crossfader")* | Se arrastra el disco completo (gira de verdad, con inercia — un giro rápido sigue girando hasta frenar) o se usan las flechas ↑/↓ del teclado | `DeckState.gain` | Se combina con el volumen del crossfader (`computeEffectiveVolume`) y se envía como `player.setVolume(...)`. Arranca al máximo (100), no a la mitad — ver nota de volumen abajo |
 | **Knob FILTER** *(tooltip aclara que es solo visual)* | Igual interacción que Gain | `DeckState.filter` | Aplica un filtro CSS `saturate()` en vivo sobre el video — efecto visual, no de audio (el audio del embed de YouTube no es interceptable) |
 
@@ -95,31 +95,24 @@ soltaste el mouse. Las flechas del teclado siguen funcionando igual que antes (a
 
 **Cue, rehecho para que se sienta natural:** la versión anterior obligaba a calcular a ciegas un
 % de la pista con un knob, sin escuchar nada mientras tanto — nunca se sentía como "marcar el
-momento que estoy escuchando". Ahora el flujo es: tocar o arrastrar la waveform (o simplemente
+momento que estoy escuchando". Ahora el flujo es: arrastrar la barra de posición (o simplemente
 reproducir) hasta el momento deseado, tocar **MARCAR** para guardarlo ahí, y usar **CUE** para
 volver — toque corto corta y vuelve al punto; mantener presionado reproduce una vista previa desde
 ahí y, al soltar, vuelve a pausar en el mismo lugar. Se eliminó el knob "Cue pt." — quedó obsoleto
 una vez que marcar el punto en vivo lo reemplaza.
 
-**Bug corregido — la waveform se movía a saltos, no en tiempo real:** la posición se leía del
-reproductor real cada 400ms (`setInterval`), y esa lectura se aplicaba con `wavesurfer.seekTo(...)`,
-que redibuja el canvas de golpe — el resultado eran saltos visibles cada 400ms en vez de un
-movimiento continuo. Se corrigió reemplazando el redibujado interno de WaveSurfer por una línea de
-posición propia (superpuesta a la onda, igual mecanismo que la marca del cue) que se desliza con una
-transición CSS (`transition: left 260ms linear`) entre lecturas — WaveSurfer ahora solo dibuja la
-forma de la onda y maneja el clic/arrastre para saltar, nunca la posición en vivo. El intervalo de
-lectura también bajó de 400ms a 200ms para tener más puntos de referencia. Un salto explícito (Cue,
-Marcar, o tocar la waveform) desactiva la transición por un instante para que la línea salte directo
-al nuevo lugar en vez de deslizarse visiblemente hasta ahí.
-
-**Bug corregido — no se podía arrastrar para adelantar, como en YouTube:** `interact: true` en
-WaveSurfer solo habilita el clic (saltar a un punto tocándolo una vez); el arrastre continuo
-(mantener presionado y mover el dedo/mouse para adelantar o retroceder, como el buscador de
-YouTube) es una opción aparte, `dragToSeek`, que faltaba activar. Se agregó, y además se sumó una
-manija circular visible sobre la línea de posición para que quede claro que se puede agarrar y
-arrastrar. Mientras se arrastra, la línea sigue el puntero al instante (evento `drag` de WaveSurfer,
-solo visual); el salto real al reproductor se confirma al soltar (evento `interaction`, el mismo de
-antes) — así no se satura el reproductor real con un `seekTo` por cada pixel de arrastre.
+**Historia de `WavePanel.tsx` — de "onda falsa" a barra simple:** la primera versión usaba
+WaveSurfer.js para dibujar una forma de onda con datos generados (no reales, ya que un embed de
+YouTube no expone su audio para analizar). Con eso vinieron tres problemas seguidos: la posición
+saltaba cada 400ms en vez de moverse en tiempo real (WaveSurfer redibujaba el canvas de golpe en
+cada lectura), no se podía arrastrar para adelantar como en un reproductor real (faltaba activar
+`dragToSeek`, una opción separada del clic), y finalmente — pedido explícito — la onda decorativa
+en sí no aportaba nada real y confundía. Se sacó WaveSurfer.js por completo (dependencia incluida,
+`npm uninstall wavesurfer.js`) y se reemplazó por una barra simple hecha a mano: una línea con
+manija en el color del deck que sigue el puntero al arrastrar (`onPointerDown`/`pointermove`/
+`pointerup` con listeners globales, mismo patrón que ya se usa para el botón CUE), con una
+transición CSS para que la reproducción normal se vea fluida sin saltos, y sin transición durante
+un arrastre o un salto explícito para que la línea responda al instante.
 
 **¿Qué son Gain y Cue, en términos simples?**
 - **Gain** = qué tan fuerte suena ese deck. Se multiplica con la posición del crossfader: si el
@@ -302,7 +295,7 @@ altas, bajas y correcciones de duración incluidas.
 | Cue: toque corto (salta y pausa) | ✅ (`Deck.test.tsx`) | — (requiere reproductor real; el flujo se confirmó visualmente en navegador) |
 | Cue: mantener presionado (preview) y soltar (vuelve y pausa) | ✅ (`Deck.test.tsx`, timers simulados) | — (requiere reproductor real) |
 | MARCAR (guarda la posición actual como cue) | ✅ (`Deck.test.tsx`, `mixerMath.test.ts`) | — (requiere reproductor real) |
-| Waveform interactiva (tocar/arrastrar para saltar) | ✅ (`Deck.test.tsx`, prop capturada del componente mockeado) | — (requiere reproductor real; se confirmó sin errores de consola en navegador) |
+| Barra de posición (tocar/arrastrar para saltar) | ✅ (`Deck.test.tsx`, prop capturada del componente mockeado) | ✅ (arrastre confirmado visualmente en navegador, la línea sigue el puntero sin errores de consola) |
 | CoverFlow — no se cuelga al borrar la tarjeta activa en la última posición | ✅ (test de regresión, confirmado que falla sin el fix) | ✅ |
 | Verificación de reproducibilidad antes de agregar (bloquea videos no embebibles) | ✅ (`AddTrackModal.test.tsx`, chequeo mockeado) | — (requiere red real hacia YouTube; el flujo de "Verificando…" se confirmó en navegador) |
 
