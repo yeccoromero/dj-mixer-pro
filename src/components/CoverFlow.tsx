@@ -17,7 +17,7 @@ interface CoverFlowProps {
 const VISIBLE_RADIUS = 2 // show up to 2 cards fanned on each side of the active one
 const CARD_WIDTH = 128
 const CARD_HEIGHT = 172
-const STEP_X = 108 // horizontal distance each side card slides per position
+const STEP_X = 84 // horizontal distance each side card slides per position
 
 function formatDuration(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60)
@@ -80,7 +80,7 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({
         <AddTrackModal onAddTrack={onAddTrack} />
       </div>
 
-      <div className="relative flex h-52 items-center justify-center" style={{ perspective: 900 }}>
+      <div className="relative flex h-52 items-center justify-center overflow-hidden" style={{ perspective: 900 }}>
         <button
           type="button"
           onClick={() => move(-1)}
