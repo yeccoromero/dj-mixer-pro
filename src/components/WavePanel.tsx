@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 
 const PLAYHEAD_TRANSITION_MS = 260
@@ -51,7 +51,13 @@ export const WavePanel: React.FC<WavePanelProps> = ({
     onSeekRef.current = onSeek
   }, [onSeek])
 
+  // While the user is actively dragging across the waveform, the line follows the pointer
+  // 1:1 in real time (like YouTube's own scrubber) instead of waiting for the real player
+  // to actually seek and report back — that round trip alone would feel laggy to drag.
+  const [dragPosition, setDragPosition] = useState<number | null>(null)
+
   const playheadColor = accent === 'lime' ? '#d7ff43' : '#00eec4'
+  const displayedProgress = dragPosition ?? progress
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -70,14 +76,24 @@ export const WavePanel: React.FC<WavePanelProps> = ({
       barGap: 2,
       barRadius: 2,
       interact: true,
+      // Click alone (`interact: true`) only jumps to where you tap — it does not let you
+      // press and drag across the bar to scrub, which is what a real player's seek bar
+      // does. This is what actually enables that.
+      dragToSeek: true,
     })
 
     wavesurferRef.current = wavesurfer
     // Loaded against a fixed 1-second duration (fake peaks, no real audio decoding), so
-    // the position `interaction` reports back is already a 0-1 ratio — that's what lets
+    // the position these events report back is already a 0-1 ratio — that's what lets
     // clicking/dragging the waveform double as "scrub to find a moment".
     void wavesurfer.load('', [generatePeaks(seed)], 1)
+    // `interaction` fires once per click or completed drag — this is what actually moves
+    // the real player, same as before.
     wavesurfer.on('interaction', (newTime) => onSeekRef.current?.(newTime))
+    // `drag`/`dragend` fire continuously while the pointer moves — used only to drive the
+    // instant visual feedback above, not the real seek (that would be excessive).
+    wavesurfer.on('drag', (relativeX) => setDragPosition(relativeX))
+    wavesurfer.on('dragend', () => setDragPosition(null))
 
     return () => {
       wavesurfer.destroy()
@@ -96,12 +112,20 @@ export const WavePanel: React.FC<WavePanelProps> = ({
       <div
         className="pointer-events-none absolute top-0 h-full w-0.5 -translate-x-1/2"
         style={{
-          left: `${Math.min(100, Math.max(0, progress * 100))}%`,
+          left: `${Math.min(100, Math.max(0, displayedProgress * 100))}%`,
           backgroundColor: playheadColor,
-          transition: smoothPlayhead ? `left ${PLAYHEAD_TRANSITION_MS}ms linear` : 'none',
+          transition: smoothPlayhead && dragPosition === null ? `left ${PLAYHEAD_TRANSITION_MS}ms linear` : 'none',
         }}
         aria-hidden="true"
-      />
+      >
+        {/* A small round handle at the top, like a normal video player's seek bar — makes
+            it visually obvious the line is something you can grab and drag, not just a
+            passive indicator. The whole waveform is draggable either way (dragToSeek). */}
+        <div
+          className="absolute -top-1 left-1/2 h-3 w-3 -translate-x-1/2 rounded-full border-2 border-white shadow"
+          style={{ backgroundColor: playheadColor }}
+        />
+      </div>
       {typeof cueProgress === 'number' && (
         <div
           className="pointer-events-none absolute top-0 h-full w-0.5 -translate-x-1/2 bg-white/90"
