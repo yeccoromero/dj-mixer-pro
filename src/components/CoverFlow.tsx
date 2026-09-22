@@ -15,6 +15,9 @@ interface CoverFlowProps {
 }
 
 const VISIBLE_RADIUS = 2 // show up to 2 cards fanned on each side of the active one
+const CARD_WIDTH = 128
+const CARD_HEIGHT = 172
+const STEP_X = 108 // horizontal distance each side card slides per position
 
 function formatDuration(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60)
@@ -88,7 +91,7 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({
           <ChevronLeft className="h-4 w-4" />
         </button>
 
-        <div className="flex items-center justify-center">
+        <div className="relative" style={{ width: CARD_WIDTH, height: CARD_HEIGHT }}>
           <AnimatePresence initial={false}>
             {tracks.map((track, index) => {
               const offset = index - centerIndex
@@ -98,21 +101,22 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({
               return (
                 <motion.div
                   key={track.id}
-                  layout
                   onClick={() => {
                     if (!isActive) setCenterIndex(index)
                   }}
                   className={cn(
-                    'coverflow-card relative -mx-5 shrink-0 overflow-hidden rounded-2xl border-2 shadow-lg',
+                    'coverflow-card absolute inset-0 overflow-hidden rounded-2xl border-2 shadow-lg',
                     isActive ? 'cursor-default border-white/70' : 'cursor-pointer border-white/20',
                   )}
-                  style={{ width: 128, height: 172, zIndex: 10 - Math.abs(offset) }}
-                  initial={{ opacity: 0 }}
+                  style={{ zIndex: 10 - Math.abs(offset) }}
+                  initial={{ opacity: 0, x: offset * STEP_X, scale: 0.7 }}
                   animate={{
+                    x: offset * STEP_X,
                     opacity: isActive ? 1 : 0.82 - Math.abs(offset) * 0.12,
                     scale: isActive ? 1.08 : 0.86 - Math.abs(offset) * 0.05,
                     rotateY: offset * -22,
                   }}
+                  exit={{ opacity: 0, scale: 0.7 }}
                   transition={{ type: 'spring', stiffness: 260, damping: 26 }}
                   drag={isActive ? 'x' : false}
                   dragConstraints={{ left: 0, right: 0 }}
