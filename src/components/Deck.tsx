@@ -199,16 +199,10 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
 
       <WavePanel seed={state.track?.id ?? id} progress={progress} isPlaying={state.isPlaying} accent={color} />
 
-      <div className="flex items-center justify-between px-0.5" onClick={(event) => event.stopPropagation()}>
-        <span className={cn(ledClass, 'text-xs')} title="Tiempo transcurrido">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2" onClick={(event) => event.stopPropagation()}>
+        <span className={cn(ledClass, 'justify-self-start text-xs')} title="Tiempo transcurrido">
           {formatTime(state.currentTime)}
         </span>
-        <span className={cn(ledClass, 'text-xs')} title="Tiempo restante">
-          -{formatTime(Math.max(0, duration - state.currentTime))}
-        </span>
-      </div>
-
-      <div className="flex flex-col items-center gap-2" onClick={(event) => event.stopPropagation()}>
         <button
           type="button"
           disabled={!ready}
@@ -221,10 +215,16 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
         >
           {state.isPlaying ? <Pause className="h-7 w-7" /> : <Play className="h-7 w-7 translate-x-0.5" />}
         </button>
+        <span className={cn(ledClass, 'justify-self-end text-xs')} title="Tiempo restante">
+          -{formatTime(Math.max(0, duration - state.currentTime))}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-center" onClick={(event) => event.stopPropagation()}>
         <button
           type="button"
           disabled={!ready}
-          title="Salta la reproducción al punto marcado por el knob 'Cue pt.'"
+          title="Salta directo al punto guardado en la pista (el knob 'Cue pt.' define cuál) — útil para volver siempre al mismo lugar, como el estribillo"
           onClick={() => jumpToCue()}
           className="knob flex h-8 w-16 items-center justify-center text-[10px] font-semibold uppercase disabled:cursor-not-allowed disabled:opacity-40"
         >
