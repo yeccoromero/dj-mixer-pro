@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 
+const PLAYHEAD_TRANSITION_MS = 260
+
 interface WavePanelProps {
   seed: string
   progress: number // 0-1
@@ -8,6 +10,10 @@ interface WavePanelProps {
   accent?: 'lime' | 'aqua'
   /** 0-1 position of the saved cue point, drawn as a marker over the waveform. */
   cueProgress?: number
+  /** False right after an explicit seek (Cue/Marcar/waveform click), so the playhead
+   * snaps to the new spot instantly instead of gliding there like it does during normal
+   * playback. Defaults to true. */
+  smoothPlayhead?: boolean
   /** Called with a 0-1 ratio when the user clicks or drags on the waveform to seek. */
   onSeek?: (progress: number) => void
 }
@@ -35,6 +41,7 @@ export const WavePanel: React.FC<WavePanelProps> = ({
   isPlaying,
   accent = 'lime',
   cueProgress,
+  smoothPlayhead = true,
   onSeek,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -44,16 +51,20 @@ export const WavePanel: React.FC<WavePanelProps> = ({
     onSeekRef.current = onSeek
   }, [onSeek])
 
+  const playheadColor = accent === 'lime' ? '#d7ff43' : '#00eec4'
+
   useEffect(() => {
     if (!containerRef.current) return
 
-    const progressColor = accent === 'lime' ? '#d7ff43' : '#00eec4'
-
+    // Waveform shape and click/drag-to-seek only — position is tracked by the playhead
+    // line below instead, not by WaveSurfer's own progress fill (see the note on that
+    // line for why: seekTo() hard-redraws the canvas, which is exactly the "jumps in
+    // steps" motion this was meant to fix).
     const wavesurfer = WaveSurfer.create({
       container: containerRef.current,
       height: 56,
       waveColor: 'rgba(0,0,0,0.18)',
-      progressColor,
+      progressColor: 'rgba(0,0,0,0.18)',
       cursorWidth: 0,
       barWidth: 2,
       barGap: 2,
@@ -63,8 +74,8 @@ export const WavePanel: React.FC<WavePanelProps> = ({
 
     wavesurferRef.current = wavesurfer
     // Loaded against a fixed 1-second duration (fake peaks, no real audio decoding), so
-    // both `seekTo` and the position `interaction` reports back are already 0-1 ratios —
-    // that's what lets clicking/dragging the waveform double as "scrub to find a moment".
+    // the position `interaction` reports back is already a 0-1 ratio — that's what lets
+    // clicking/dragging the waveform double as "scrub to find a moment".
     void wavesurfer.load('', [generatePeaks(seed)], 1)
     wavesurfer.on('interaction', (newTime) => onSeekRef.current?.(newTime))
 
@@ -72,15 +83,25 @@ export const WavePanel: React.FC<WavePanelProps> = ({
       wavesurfer.destroy()
       wavesurferRef.current = null
     }
-  }, [seed, accent])
-
-  useEffect(() => {
-    wavesurferRef.current?.seekTo(Math.min(1, Math.max(0, progress)))
-  }, [progress])
+  }, [seed])
 
   return (
     <div className="relative">
       <div ref={containerRef} data-playing={isPlaying} aria-hidden="true" />
+      {/* The actual playback position. A CSS `left` transition glides it smoothly between
+          the ~4x/second position updates from the deck instead of jumping — the same
+          reason it's a plain line rather than driving WaveSurfer's own progress redraw.
+          `smoothPlayhead=false` (right after an explicit seek) skips the transition for
+          one update so it snaps straight to the new spot instead of visibly sliding there. */}
+      <div
+        className="pointer-events-none absolute top-0 h-full w-0.5 -translate-x-1/2"
+        style={{
+          left: `${Math.min(100, Math.max(0, progress * 100))}%`,
+          backgroundColor: playheadColor,
+          transition: smoothPlayhead ? `left ${PLAYHEAD_TRANSITION_MS}ms linear` : 'none',
+        }}
+        aria-hidden="true"
+      />
       {typeof cueProgress === 'number' && (
         <div
           className="pointer-events-none absolute top-0 h-full w-0.5 -translate-x-1/2 bg-white/90"

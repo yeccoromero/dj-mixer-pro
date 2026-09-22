@@ -82,7 +82,7 @@ solo pasan por los botones de este panel, que son los que llaman a `player.playV
 |---|---|---|---|
 | **Cuerpo del deck** (clic en cualquier parte no interactiva) | Marca este deck como el "activo" | `DJMixer.activeDeck` | Determina a qué deck carga la próxima pista con el botón "Cargar en Deck" de `CoverFlow` |
 | **Contador LED (transcurrido) / Botón ▶/⏸ (Play/Pause) / Contador LED (restante)** | Los tres van en una sola fila, con el Play exactamente al centro entre los dos contadores (`grid-cols-[1fr_auto_1fr]`) — es el control principal del deck | El Play toca `DeckState.isPlaying` (lo actualiza el propio evento `onStateChange` del reproductor, no el clic directamente); los contadores solo leen `DeckState.currentTime`/`track.duration`, son informativos | Play deshabilitado hasta que el reproductor emite `onReady` |
-| **Waveform** *(ahora interactiva)* | Tocar o arrastrar sobre la onda salta la reproducción a ese punto en vivo, escuchando mientras se explora — reemplaza al viejo knob "Cue pt." como forma de moverse por la pista | `player.seekTo(...)` + `DeckState.currentTime` | `interact: true` en WaveSurfer, evento `interaction` conectado a `player.seekTo`. Muestra además una marca blanca vertical en la posición del cue guardado |
+| **Waveform** *(ahora interactiva)* | Tocar o arrastrar sobre la onda salta la reproducción a ese punto en vivo, escuchando mientras se explora — reemplaza al viejo knob "Cue pt." como forma de moverse por la pista | `player.seekTo(...)` + `DeckState.currentTime` | `interact: true` en WaveSurfer solo para la forma y el clic/arrastre; la posición ya no se dibuja con el redibujado interno de WaveSurfer (eso es lo que causaba los saltos — ver nota abajo). Muestra además una marca blanca vertical en la posición del cue guardado |
 | **Botón CUE** *(más chico, debajo del Play — control secundario)* | **Toque corto**: salta al punto de cue guardado y pausa ahí (si estaba sonando, corta). **Mantener presionado**: reproduce de prueba desde el cue mientras se sostiene; al soltar, vuelve al cue y pausa de nuevo — igual que el botón Cue de un CDJ real | Lee `DeckState.cue` (0–100%) y `track.duration` para calcular el segundo exacto; `player.seekTo(...)` + `player.pauseVideo()`/`playVideo()` | Deshabilitado hasta `onReady` y si no hay pista asignada. El "soltar" se detecta con un listener global de `pointerup`, así funciona aunque el puntero se mueva fuera del botón antes de soltar |
 | **Botón MARCAR** | Guarda la posición actual de reproducción como el nuevo punto de cue — se escucha el momento exacto (o se busca tocando la waveform) y se marca ahí, en vez de calcular a ciegas un % | `DeckState.cue` (`lib/mixerMath.ts#computeCuePercent`) | Da un flash visual breve de confirmación al tocarlo |
 | **Knob GAIN** *(tooltip: "Ganancia del deck: se combina con el crossfader")* | Se arrastra el disco completo (gira de verdad, con inercia — un giro rápido sigue girando hasta frenar) o se usan las flechas ↑/↓ del teclado | `DeckState.gain` | Se combina con el volumen del crossfader (`computeEffectiveVolume`) y se envía como `player.setVolume(...)`. Arranca al máximo (100), no a la mitad — ver nota de volumen abajo |
@@ -100,6 +100,17 @@ reproducir) hasta el momento deseado, tocar **MARCAR** para guardarlo ahí, y us
 volver — toque corto corta y vuelve al punto; mantener presionado reproduce una vista previa desde
 ahí y, al soltar, vuelve a pausar en el mismo lugar. Se eliminó el knob "Cue pt." — quedó obsoleto
 una vez que marcar el punto en vivo lo reemplaza.
+
+**Bug corregido — la waveform se movía a saltos, no en tiempo real:** la posición se leía del
+reproductor real cada 400ms (`setInterval`), y esa lectura se aplicaba con `wavesurfer.seekTo(...)`,
+que redibuja el canvas de golpe — el resultado eran saltos visibles cada 400ms en vez de un
+movimiento continuo. Se corrigió reemplazando el redibujado interno de WaveSurfer por una línea de
+posición propia (superpuesta a la onda, igual mecanismo que la marca del cue) que se desliza con una
+transición CSS (`transition: left 260ms linear`) entre lecturas — WaveSurfer ahora solo dibuja la
+forma de la onda y maneja el clic/arrastre para saltar, nunca la posición en vivo. El intervalo de
+lectura también bajó de 400ms a 200ms para tener más puntos de referencia. Un salto explícito (Cue,
+Marcar, o tocar la waveform) desactiva la transición por un instante para que la línea salte directo
+al nuevo lugar en vez de deslizarse visiblemente hasta ahí.
 
 **¿Qué son Gain y Cue, en términos simples?**
 - **Gain** = qué tan fuerte suena ese deck. Se multiplica con la posición del crossfader: si el

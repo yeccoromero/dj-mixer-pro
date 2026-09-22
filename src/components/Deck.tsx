@@ -24,6 +24,10 @@ const accent = { A: 'lime', B: 'aqua' } as const
 // "preview from here" hold — long enough that a normal tap never crosses it, short enough
 // that holding still feels immediate.
 const CUE_HOLD_THRESHOLD_MS = 200
+// How often we ask the real player where it is. Frequent enough that the playhead line
+// (which glides smoothly between updates via CSS, see WavePanel) reads as continuous
+// motion rather than visible steps, without hammering the postMessage bridge to the iframe.
+const POLL_INTERVAL_MS = 200
 
 export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, onActivate, onDurationResolved }) => {
   const containerId = `yt-player-${id}`
@@ -139,7 +143,7 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
         const currentTime = playerRef.current.getCurrentTime()
         onStateChange((prev) => (prev.isPlaying ? { ...prev, currentTime } : prev))
       }
-    }, 400)
+    }, POLL_INTERVAL_MS)
     return () => {
       if (pollRef.current) window.clearInterval(pollRef.current)
     }
@@ -154,13 +158,22 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
     }
   }
 
+  // The playhead line glides smoothly between poll updates during normal playback (see
+  // WavePanel) — but an explicit seek is a deliberate jump, not a small forward step, so it
+  // needs to land instantly instead of visibly sliding there. Turning the transition off for
+  // exactly one paint (via a double rAF, so the browser commits the "no transition" style
+  // before the new position applies) and back on again gets both behaviors from one line.
+  const [smoothPlayhead, setSmoothPlayhead] = useState(true)
+
   /** Seeks the real player AND updates `currentTime` immediately, so the LED counters and
-   * waveform reflect the new position right away — the 400ms poll below only runs while
-   * playing, so without this a seek while paused would look like it silently did nothing. */
+   * waveform reflect the new position right away — the poll below only runs while playing,
+   * so without this a seek while paused would look like it silently did nothing. */
   const seekAndSync = (seconds: number) => {
     if (!playerRef.current) return
     playerRef.current.seekTo(seconds, true)
+    setSmoothPlayhead(false)
     onStateChange((prev) => ({ ...prev, currentTime: seconds }))
+    requestAnimationFrame(() => requestAnimationFrame(() => setSmoothPlayhead(true)))
   }
 
   // Reads via refs (not `state`/`ready` directly) so it's safe to call from the mount-only
@@ -279,6 +292,7 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
         isPlaying={state.isPlaying}
         accent={color}
         cueProgress={state.track ? state.cue / 100 : undefined}
+        smoothPlayhead={smoothPlayhead}
         onSeek={handleWaveformSeek}
       />
 
