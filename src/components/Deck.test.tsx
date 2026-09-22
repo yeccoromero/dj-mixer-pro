@@ -129,13 +129,22 @@ describe('Deck', () => {
     expect(mockPlayer.pauseVideo).toHaveBeenCalled()
   })
 
-  it('a quick tap on Cue jumps to the marked point and pauses there', async () => {
+  it('a quick tap on Cue jumps to the marked point without pausing', async () => {
     await renderReadyDeck(baseState({ cue: 25, isPlaying: true })) // track.duration = 200 -> 50s
     const cueButton = screen.getByText('Cue')
     fireEvent.pointerDown(cueButton)
     fireEvent.pointerUp(cueButton)
     expect(mockPlayer.seekTo).toHaveBeenCalledWith(50, true)
-    expect(mockPlayer.pauseVideo).toHaveBeenCalled()
+    expect(mockPlayer.pauseVideo).not.toHaveBeenCalled()
+  })
+
+  it('a quick tap on Cue while paused jumps to the marked point and stays paused', async () => {
+    await renderReadyDeck(baseState({ cue: 25, isPlaying: false }))
+    const cueButton = screen.getByText('Cue')
+    fireEvent.pointerDown(cueButton)
+    fireEvent.pointerUp(cueButton)
+    expect(mockPlayer.seekTo).toHaveBeenCalledWith(50, true)
+    expect(mockPlayer.playVideo).not.toHaveBeenCalled()
   })
 
   it('does nothing when Play/Cue are used before the player is ready', () => {
@@ -152,7 +161,7 @@ describe('Deck', () => {
 
     fireEvent.pointerDown(cueButton)
     expect(mockPlayer.seekTo).toHaveBeenCalledWith(50, true)
-    expect(mockPlayer.pauseVideo).toHaveBeenCalledTimes(1)
+    expect(mockPlayer.pauseVideo).not.toHaveBeenCalled()
 
     vi.advanceTimersByTime(250)
     expect(mockPlayer.playVideo).toHaveBeenCalledTimes(1)

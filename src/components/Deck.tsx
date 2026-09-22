@@ -191,19 +191,27 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
     requestAnimationFrame(() => requestAnimationFrame(() => setSmoothPlayhead(true)))
   }
 
-  // Reads via refs (not `state`/`ready` directly) so it's safe to call from the mount-only
-  // pointerup listener below, which would otherwise close over stale values forever.
-  const jumpToCueAndStop = () => {
+  // Both read via refs (not `state`/`ready` directly) so they're safe to call from the
+  // mount-only pointerup listener below, which would otherwise close over stale values
+  // forever.
+  const jumpToCue = () => {
     const track = stateRef.current.track
     if (!playerRef.current || !track) return
     seekAndSync((stateRef.current.cue / 100) * track.duration)
-    playerRef.current.pauseVideo()
   }
 
-  // Cue behaves like a real CDJ's cue button: a quick tap jumps back to the marked point and
-  // stops there; holding it down previews playback from that point, and releasing snaps back
-  // to the marker and stops again — a single, global `pointerup` listener catches the release
-  // even if the pointer drifted off the button first.
+  const jumpToCueAndStop = () => {
+    jumpToCue()
+    playerRef.current?.pauseVideo()
+  }
+
+  // A quick tap on Cue jumps to the marked point without touching playback state — if it
+  // was playing, it keeps playing from there; if it was paused, it stays paused there.
+  // Holding the button down previews playback from that point regardless of what was
+  // happening before, and releasing snaps back to the marker and stops — that one always
+  // pauses, since the whole point of a preview is to leave you exactly where you started
+  // once you let go. A single, global `pointerup` listener catches the release even if the
+  // pointer drifted off the button first.
   const isPressedRef = useRef(false)
   const isHoldPreviewRef = useRef(false)
   const holdTimerRef = useRef<number | null>(null)
@@ -230,7 +238,7 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
     if (!playerRef.current || !readyRef.current || !stateRef.current.track) return
     isPressedRef.current = true
     isHoldPreviewRef.current = false
-    jumpToCueAndStop()
+    jumpToCue()
     holdTimerRef.current = window.setTimeout(() => {
       if (!isPressedRef.current) return
       isHoldPreviewRef.current = true
@@ -335,7 +343,7 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
         <button
           type="button"
           disabled={!ready || !state.track}
-          title="Toque corto: salta al punto marcado y para ahí. Mantener presionado: reproduce de prueba desde ese punto; al soltar, vuelve ahí y para."
+          title="Toque corto: salta al punto marcado sin cortar la reproducción. Mantener presionado: reproduce de prueba desde ese punto; al soltar, vuelve ahí y pausa."
           onPointerDown={handleCuePointerDown}
           className="knob flex h-8 w-16 items-center justify-center text-[10px] font-semibold uppercase disabled:cursor-not-allowed disabled:opacity-40"
         >
