@@ -210,6 +210,15 @@ describe('Deck', () => {
     expect(updater(baseState({ cue: 25 })).cue).toBe(50)
   })
 
+  it('the reset button clears the cue point back to 0, regardless of where it was marked', async () => {
+    const { onStateChange } = await renderReadyDeck(baseState({ cue: 63 }))
+    fireEvent.click(screen.getByTitle('Reinicia el punto de cue al comienzo de la pista (0%)'))
+
+    expect(onStateChange).toHaveBeenCalled()
+    const updater = onStateChange.mock.calls[onStateChange.mock.calls.length - 1][0] as (s: DeckState) => DeckState
+    expect(updater(baseState({ cue: 63 })).cue).toBe(0)
+  })
+
   it('seeking via the waveform moves the real player and updates currentTime immediately', async () => {
     const { onStateChange } = await renderReadyDeck(baseState())
     act(() => capturedWavePanelProps?.onSeek?.(0.25))

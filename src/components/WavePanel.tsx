@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState } from 'react'
 
 const FILL_TRANSITION_MS = 260
 const THUMB_TRANSITION = 'width 120ms ease, height 120ms ease, opacity 120ms ease'
-const THIN_HEIGHT = 4
-const EXPANDED_HEIGHT = 6
+// 40% thicker than the original 4/6px, per explicit request.
+const THIN_HEIGHT = 5.6
+const EXPANDED_HEIGHT = 8.4
 const THUMB_SIZE = 12
 
 interface WavePanelProps {

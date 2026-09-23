@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Play, Pause, Disc3, AlertTriangle } from 'lucide-react'
+import { Play, Pause, Disc3, AlertTriangle, RotateCcw } from 'lucide-react'
 import type { DeckState } from './DJMixer'
 import { VerticalFader } from './VerticalFader'
 import { WavePanel } from './WavePanel'
@@ -266,6 +266,12 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
     window.setTimeout(() => setJustMarked(false), 400)
   }
 
+  /** Clears the cue point back to the very start of the track — the only way to get back
+   * to 0% once Marcar has moved it, short of scrubbing there and marking it again by hand. */
+  const handleResetCue = () => {
+    onStateChange((prev) => ({ ...prev, cue: 0 }))
+  }
+
   const handleWaveformSeek = (ratio: number) => {
     if (!playerRef.current || !ready || !state.track) return
     seekAndSync(ratio * state.track.duration)
@@ -386,6 +392,15 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
           )}
         >
           Marcar
+        </button>
+        <button
+          type="button"
+          disabled={!ready || !state.track}
+          title="Reinicia el punto de cue al comienzo de la pista (0%)"
+          onClick={handleResetCue}
+          className="knob flex h-8 w-8 items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
         </button>
       </div>
     </motion.div>
