@@ -26,13 +26,16 @@ afecta, y cómo se conecta con el resto de componentes. Todo lo aquí descrito e
         └───────────┘      │    tsx)      │      └───────────┘
                             └─────────────┘
                                    │
-                    ┌──────────────┴──────────────┐
-                    │                              │
-             ┌─────────────┐               ┌────────────┐
-             │  CoverFlow  │               │EffectsPanel│
-             │(+AddTrack   │               │            │
-             │   Modal)    │               │            │
-             └─────────────┘               └────────────┘
+                                   │
+                            ┌─────────────┐
+                            │  CoverFlow  │
+                            │(+AddTrack   │
+                            │   Modal)    │
+                            └─────────────┘
+                                   │
+                            ┌─────────────┐
+                            │EffectsPanel │
+                            └─────────────┘
 ```
 
 `DJMixer.tsx` es el único componente con estado "real". Todo lo demás recibe props hacia abajo y
@@ -61,6 +64,12 @@ global entre componentes: toda la comunicación pasa por `DJMixer.tsx`.
 
 Los 4 botones comparten la misma lógica (`trigger(effect)`): reproducen el sonido y aplican una
 animación de "flash" de 350ms en el propio botón. Son autocontenidos, no dependen de estado global.
+
+**Ubicación — debajo de la Biblioteca, no arriba de todo:** vivía como una barra propia a todo lo
+ancho, entre el header y los tres paneles principales — separado del resto y sin relación visual
+con ningún otro control. Pedido explícito de moverlo debajo de Biblioteca, dentro de la misma
+columna central. Se redujo a una botonera compacta (`grid grid-cols-4`, íconos y texto más chicos)
+para que las 4 acciones quepan en el ancho de esa columna en vez del ancho completo de la página.
 
 ---
 

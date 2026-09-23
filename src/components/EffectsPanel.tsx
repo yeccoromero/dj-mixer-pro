@@ -26,22 +26,26 @@ export const EffectsPanel: React.FC<EffectsPanelProps> = ({ onEffectTrigger }) =
   }
 
   return (
-    <div className="panel mx-auto flex max-w-7xl items-center justify-center gap-3 p-4">
-      {EFFECTS.map(({ id, label, icon: Icon }) => (
-        <motion.button
-          key={id}
-          type="button"
-          onClick={() => trigger(id)}
-          whileTap={{ scale: 0.9 }}
-          className={cn(
-            'flex flex-col items-center gap-1 rounded-2xl border-2 border-transparent bg-panel px-5 py-3 shadow-sm transition-colors',
-            activeEffect === id && 'animate-flash-pulse border-lime-accent bg-lime-accent/30',
-          )}
-        >
-          <Icon className="h-5 w-5" />
-          <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
-        </motion.button>
-      ))}
+    <div className="panel flex flex-col gap-3 p-5">
+      <span className="music-body">Efectos</span>
+      <div className="grid grid-cols-4 gap-2">
+        {EFFECTS.map(({ id, label, icon: Icon }) => (
+          <motion.button
+            key={id}
+            type="button"
+            onClick={() => trigger(id)}
+            whileTap={{ scale: 0.9 }}
+            title={label}
+            className={cn(
+              'flex flex-col items-center gap-1 rounded-xl border-2 border-transparent bg-panel py-2.5 shadow-sm transition-colors',
+              activeEffect === id && 'animate-flash-pulse border-lime-accent bg-lime-accent/30',
+            )}
+          >
+            <Icon className="h-4 w-4" />
+            <span className="text-[10px] font-medium uppercase tracking-wide">{label}</span>
+          </motion.button>
+        ))}
+      </div>
     </div>
   )
 }

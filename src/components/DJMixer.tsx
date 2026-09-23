@@ -167,9 +167,6 @@ export const DJMixer: React.FC = () => {
         </div>
       </motion.div>
 
-      {/* Panel de efectos */}
-      <EffectsPanel onEffectTrigger={handleEffectTrigger} />
-
       {/* Layout principal */}
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Deck A */}
@@ -196,6 +193,8 @@ export const DJMixer: React.FC = () => {
             onAddTrack={handleAddTrack}
             onRemoveTrack={handleRemoveTrack}
           />
+
+          <EffectsPanel onEffectTrigger={handleEffectTrigger} />
         </div>
 
         {/* Deck B */}
