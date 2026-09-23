@@ -68,7 +68,24 @@ soltar — detectado con un listener global de `pointerup`/`pointercancel`, igua
 de cada deck, así funciona aunque el puntero se mueva fuera del botón antes de soltar — cada uno
 resuelve su propio final (la sirena hace un último barrido descendente, el airhorn suelta su
 envolvente, el láser y la radio simplemente cortan su repetición) antes de descartar sus nodos de
-audio. El botón se ilumina mientras está sostenido y se apaga al soltar.
+audio. Mientras está sostenido, el botón se "hunde" (baja 3px y su sombra se achica) — ver la nota
+de diseño más abajo.
+
+**Rediseño — botones tipo tecla retro, coloridos:** a partir de varias imágenes de referencia
+(covers de playlist con grillas de puntos en colores sólidos, un mockup "Music OS" con controles
+tipo reproductor vintage, un panel de Walkman con teclas PLAY/PAUSE físicas), se reemplazó la
+píldora gris uniforme por una tecla de color sólido por efecto — alarma-rojo (Siren), bocina-
+amarillo (Airhorn), violeta sci-fi (Laser), ámbar de dial de radio (Radio) — elegidos para no
+pisar los colores de identidad de los decks (lima/aqua), ya que este panel es la parte "lúdica" de
+la app, separada de los controles serios de mezcla. Cada tecla tiene una base de un tono más oscuro
+del mismo color (no negro genérico) simulando la "pared" de una tecla física real, como en las
+referencias — al soltar, la tecla "flota" sobre esa base (sombra de 4px); al sostenerla, se hunde
+hasta casi tocarla (sombra de 1px, tecla desplazada 3px hacia abajo). Este movimiento se maneja con
+`animate` de Framer Motion (no `whileTap`): `whileTap` es una animación efímera propia de Framer
+que no se puede combinar con un `transform` fijado a mano vía `style` — Framer terminaba ganando esa
+pelea y el hundido nunca se veía. Como el estado de "sostenido" ya se mantiene en React durante todo
+el press-and-hold (no solo el instante del gesto), `animate={{ y: isHeld ? 3 : 0 }}` es lo que
+corresponde usar acá, no `whileTap`.
 
 **Ajuste — de un solo golpe a mantener presionado:** la primera versión de estos efectos era
 "tocar = un sonido de duración fija", sin relación con cuánto tiempo se mantuviera el dedo/mouse

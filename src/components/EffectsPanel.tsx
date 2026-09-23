@@ -1,18 +1,29 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Siren, Megaphone, Zap, Radio } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { startEffect, stopEffect, type EffectId } from '@/lib/effectSounds'
 
 interface EffectsPanelProps {
   onEffectTrigger: (effect: EffectId) => void
 }
 
-const EFFECTS: { id: EffectId; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: 'siren', label: 'Siren', icon: Siren },
-  { id: 'airhorn', label: 'Airhorn', icon: Megaphone },
-  { id: 'laser', label: 'Laser', icon: Zap },
-  { id: 'radio', label: 'Radio', icon: Radio },
+// Each effect gets its own flat retro color (bold, physical-keycap look — like the covers/
+// player mockups this was modeled on) instead of the uniform gray pill it used to be. Picked
+// to stay clear of the deck identity colors (lime/aqua): alarm-red, horn-yellow, sci-fi violet,
+// warm radio-dial amber. `base` is a darker shade of the same hue, not generic black — the
+// keycap reference shows each key's "wall" tinted to match its own face, not a flat gray shadow.
+const EFFECTS: {
+  id: EffectId
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  bg: string
+  base: string
+  fg: string
+}[] = [
+  { id: 'siren', label: 'Siren', icon: Siren, bg: '#FF5A36', base: '#B33D22', fg: '#FFFFFF' },
+  { id: 'airhorn', label: 'Airhorn', icon: Megaphone, bg: '#FFC933', base: '#C99A1F', fg: '#1A1A1A' },
+  { id: 'laser', label: 'Laser', icon: Zap, bg: '#7B5CFA', base: '#5138B0', fg: '#FFFFFF' },
+  { id: 'radio', label: 'Radio', icon: Radio, bg: '#E3A83B', base: '#A97527', fg: '#1A1A1A' },
 ]
 
 export const EffectsPanel: React.FC<EffectsPanelProps> = ({ onEffectTrigger }) => {
@@ -56,22 +67,34 @@ export const EffectsPanel: React.FC<EffectsPanelProps> = ({ onEffectTrigger }) =
     <div className="panel flex flex-col gap-3 p-5">
       <span className="music-body">Efectos</span>
       <div className="grid grid-cols-4 gap-2">
-        {EFFECTS.map(({ id, label, icon: Icon }) => (
-          <motion.button
-            key={id}
-            type="button"
-            onPointerDown={() => press(id)}
-            whileTap={{ scale: 0.9 }}
-            title={`Mantener presionado para ${label}`}
-            className={cn(
-              'flex flex-col items-center gap-1 rounded-xl border-2 border-transparent bg-panel py-2.5 shadow-sm transition-colors',
-              activeEffect === id && 'border-lime-accent bg-lime-accent/30',
-            )}
-          >
-            <Icon className="h-4 w-4" />
-            <span className="text-[10px] font-medium uppercase tracking-wide">{label}</span>
-          </motion.button>
-        ))}
+        {EFFECTS.map(({ id, label, icon: Icon, bg, base, fg }) => {
+          const isHeld = activeEffect === id
+          return (
+            <motion.button
+              key={id}
+              type="button"
+              onPointerDown={() => press(id)}
+              title={`Mantener presionado para ${label}`}
+              // Driven by `animate` (not `whileTap`) because this has to track our own sustained
+              // `isHeld` state for as long as the button is held, not just Framer's own instant
+              // tap gesture — and mixing whileTap's transform with a plain `style.transform` here
+              // let Framer's gesture animation silently win, so the "sink" never showed at all.
+              animate={{ y: isHeld ? 3 : 0 }}
+              transition={{ duration: 0.1 }}
+              style={{
+                backgroundColor: bg,
+                color: fg,
+                // A retro keycap: a colored "wall" the same hue as the face reads as physical
+                // height — while held, the button sinks into that wall instead of floating above it.
+                boxShadow: isHeld ? `0 1px 0 ${base}` : `0 4px 0 ${base}`,
+              }}
+              className="flex flex-col items-center gap-1 rounded-lg py-2.5 transition-[box-shadow] duration-100"
+            >
+              <Icon className="h-4 w-4" />
+              <span className="text-[10px] font-bold uppercase tracking-wide">{label}</span>
+            </motion.button>
+          )
+        })}
       </div>
     </div>
   )
