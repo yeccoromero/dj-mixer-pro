@@ -21,7 +21,8 @@
     "lucide-react": "^1.47.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "tailwind-merge": "^3.7.0"
+    "tailwind-merge": "^3.7.0",
+    "tone": "^15.1.22"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",

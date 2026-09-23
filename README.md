@@ -12,14 +12,14 @@ Un DJ mixer profesional en el navegador construido con React, TypeScript, Tailwi
 - **Contador LED de tiempo transcurrido/restante** por deck, en tipografía de matriz de puntos (`DotGothic16`)
 - **Biblioteca en stack de tarjetas** (arrastrable/swipeable) con carátula a pantalla completa, duración visible, y opción de quitar pistas
 - **Modal para agregar pistas** desde cualquier URL o ID de YouTube, con verificación de que el video se pueda reproducir antes de agregarlo
-- **Panel de efectos** (Siren, Airhorn, Laser, Radio) sintetizados con Web Audio API
+- **Panel de efectos** (Siren, Airhorn, Laser, Radio) sintetizados con Tone.js (distorsión, coro, delay, bitcrusher)
 - **Barra de posición minimalista**: una línea en el color del deck (no una onda falsa) marca el avance y se puede arrastrar para adelantar/retroceder, con una marca aparte para el punto de cue
 - **Diseño Music OS**: esquema de color lima/aqua (`#d7ff43`, `#00eec4`) sobre fondo gris claro, con lecturas tipo LED en tipografía de puntos para los contadores
 - **Persistencia local** de la biblioteca de pistas (altas y bajas) vía `localStorage`
 
 ## Stack
 
-React 19 · TypeScript · Vite · Tailwind CSS 3 · Framer Motion · GSAP (Draggable + InertiaPlugin) · Radix UI · lucide-react
+React 19 · TypeScript · Vite · Tailwind CSS 3 · Framer Motion · GSAP (Draggable + InertiaPlugin) · Tone.js · Radix UI · lucide-react
 
 ## Desarrollo
 

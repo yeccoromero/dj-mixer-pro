@@ -57,13 +57,27 @@ global entre componentes: toda la comunicación pasa por `DJMixer.tsx`.
 
 | Botón | Qué hace al hacer clic |
 |---|---|
-| **Siren** | Sintetiza un sonido de sirena (barrido de frecuencia) vía Web Audio API (`lib/effectSounds.ts`) y llama a `onEffectTrigger('siren')` |
-| **Airhorn** | Sintetiza un sonido de bocina (onda sawtooth grave) |
-| **Laser** | Sintetiza un barrido agudo→grave corto (onda cuadrada) |
-| **Radio** | Sintetiza ruido filtrado en banda (simula estática de radio) |
+| **Siren** | Barrido de sirena (500↔1100Hz, sostenido) con un leve vibrato, y llama a `onEffectTrigger('siren')` |
+| **Airhorn** | Dos notas de bocina en un sintetizador de onda sawtooth, con chorus + distorsión para el clásico "BWAAAH" |
+| **Laser** | Barrido agudo→grave corto (onda cuadrada) con una cola de ping-pong delay |
+| **Radio** | Ruido filtrado en banda pasante, con un bitcrusher adelante para la crepitación de baja fidelidad de una radio real |
 
 Los 4 botones comparten la misma lógica (`trigger(effect)`): reproducen el sonido y aplican una
 animación de "flash" de 350ms en el propio botón. Son autocontenidos, no dependen de estado global.
+
+**Motor de audio — Tone.js en vez de Web Audio API a mano:** la versión anterior armaba cada
+efecto con osciladores y nodos de ganancia creados directamente (`AudioContext.createOscillator`,
+etc.) — funcional, pero limitado: agregar un efecto de verdad (distorsión, coro, delay,
+bitcrusher) significaba escribir esos procesadores de audio a mano, DSP incluido. Se migró
+`lib/effectSounds.ts` a [Tone.js](https://github.com/Tonejs/Tone.js), la librería de referencia
+para síntesis y efectos de audio en el navegador: da sintetizadores (`Tone.Synth`,
+`Tone.PolySynth`) y procesadores (`Tone.Distortion`, `Tone.Chorus`, `Tone.PingPongDelay`,
+`Tone.BitCrusher`, `Tone.Vibrato`) ya armados, así que cada uno de los 4 efectos ganó textura real
+en vez de ser solo un tono/ruido crudo — sin escribir DSP a mano ni tocar la pista de YouTube (que
+sigue sin ser interceptable vía Web Audio API, ver la nota de "Filter" más abajo en este
+documento). Cada efecto crea su propia cadena de nodos al dispararse y los descarta (`.dispose()`)
+un momento después de terminar de sonar — son sonidos puntuales, no instrumentos persistentes, así
+que no hay razón para que ocupen memoria una vez que terminaron.
 
 **Ubicación — debajo de la Biblioteca, no arriba de todo:** vivía como una barra propia a todo lo
 ancho, entre el header y los tres paneles principales — separado del resto y sin relación visual
