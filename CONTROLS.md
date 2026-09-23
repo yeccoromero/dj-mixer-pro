@@ -437,6 +437,53 @@ mismo mecanismo a la inversa (filtra el array y vuelve a guardar), y `onDuration
 la duración de una pista existente — por eso la biblioteca sobrevive a un refresh de página, con
 altas, bajas y correcciones de duración incluidas.
 
+### Sugeridos (`SuggestedTracks.tsx`)
+
+Tira horizontal debajo de la biblioteca, pensada para acelerar el agregar pistas sin tener que
+salir de la app a buscar un link en YouTube.
+
+| Control | Qué hace | Estado que toca |
+|---|---|---|
+| **Botón "+" sobre una miniatura sugerida** | Verifica que el video se pueda reproducir acá (mismo chequeo que el modal de agregar) y, si pasa, lo agrega a la biblioteca | `SuggestedTracks` local (`addingId` mientras verifica) → `DJMixer.tracks` vía `onAddTrack` |
+
+**De dónde salen las sugerencias:** la búsqueda usa como consulta el **artista** de la tarjeta
+que está al frente en el carrusel (`CoverFlow`'s `activeTrack`), no un texto genérico — "más de
+este artista/canal" es una señal más honesta de "pega con esta canción" que una búsqueda por
+palabra clave suelta, y de paso limita cuántas búsquedas dispara solo por hojear la biblioteca
+(cambiar de tarjeta no cambia de artista en cada toque). Al cambiar de artista activo, la búsqueda
+espera 500ms sin otro cambio antes de disparar (debounce) — recorrer varias tarjetas con las
+flechas o el swipe dispara una sola búsqueda al asentarse, no una por tarjeta.
+
+**Requiere una API key propia (`VITE_YOUTUBE_API_KEY`):** a diferencia del autocompletado del modal
+de agregar (que usa el endpoint público `oEmbed`, sin key), "encontrar videos relacionados" es una
+búsqueda real (`search.list` de la YouTube Data API v3), que YouTube solo permite con una API key.
+Como esta app no tiene backend, la key viaja como variable de entorno de Vite
+(`import.meta.env.VITE_YOUTUBE_API_KEY`) y queda embebida en el bundle público — por eso hay que
+restringirla en Google Cloud Console (por referer HTTP y por API habilitada) en vez de tratarla
+como un secreto. Ver `.env.example` para el detalle de cómo conseguirla y restringirla, y el
+`README.md` para dónde configurarla en desarrollo y en Vercel.
+
+**Sin key configurada, o sin resultados, no se muestra nada:** `searchSuggestedVideos`
+(`lib/youtubeSuggestions.ts`) nunca tira una excepción — ante falta de key, cuota agotada, error de
+red o una respuesta que no sea OK, resuelve un array vacío, y el componente directamente no
+renderiza la tira (ni un mensaje de error) en cualquiera de esos casos. Es una funcionalidad
+accesoria: preferible que no se note a que rompa o ensucie la biblioteca con un error.
+
+**Antes de agregar, se verifica reproducibilidad:** igual que el modal de agregar, el botón "+" no
+agrega directamente — primero corre `lib/youtubeEmbedCheck.ts#checkVideoEmbeddable` (el mismo
+chequeo con `YT.Player` oculto que detecta bloqueos de sello) y solo si el video pasa arma un
+`Track` y llama `onAddTrack`. La duración se completa con el mismo placeholder (180s) que usa el
+modal, y se autocorrige sola al reproducirse por primera vez (ver duración real más arriba).
+
+**Cache en memoria por sesión:** una búsqueda repetida para el mismo artista (p. ej. volver a pasar
+por la misma tarjeta) no vuelve a llamar a la API — se sirve desde un `Map` en memoria
+(`lib/youtubeSuggestions.ts`), ya que el free tier de la API es de solo ~100 búsquedas/día
+(10.000 unidades, 100 por búsqueda).
+
+**Ya en la biblioteca no se sugiere de nuevo:** las sugerencias se filtran contra
+`existingTrackIds` (los IDs de YouTube ya presentes en `tracks`), tanto en el resultado cacheado
+como en el fresco, para no ofrecer agregar un video que ya está.
+
 ---
 
 ## Resumen de validación

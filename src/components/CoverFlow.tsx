@@ -3,6 +3,7 @@ import { motion, AnimatePresence, type PanInfo } from 'framer-motion'
 import { ChevronLeft, ChevronRight, X, Clock } from 'lucide-react'
 import type { Track } from './DJMixer'
 import { AddTrackModal } from './AddTrackModal'
+import { SuggestedTracks } from './SuggestedTracks'
 import { formatTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -198,6 +199,8 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({
       <p className="text-center text-xs text-muted-foreground">
         {activeTrack.title} — {activeTrack.artist}
       </p>
+
+      <SuggestedTracks basedOn={activeTrack} existingTrackIds={tracks.map((t) => t.id)} onAddTrack={onAddTrack} />
     </div>
   )
 }
