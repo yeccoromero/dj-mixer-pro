@@ -4,7 +4,6 @@ import { Deck } from './Deck'
 import { CrossFader } from './CrossFader'
 import { CoverFlow } from './CoverFlow'
 import { EffectsPanel } from './EffectsPanel'
-import heroImage from '@/assets/dj-mixer-hero.png'
 import type { EffectId } from '@/lib/effectSounds'
 import { computeCrossfaderVolumes } from '@/lib/mixerMath'
 
@@ -152,19 +151,14 @@ export const DJMixer: React.FC = () => {
     <div className="min-h-screen bg-background p-4 space-y-6">
       {/* Header */}
       <motion.div
-        className="panel relative overflow-hidden p-6"
+        className="panel p-6"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <div className="absolute inset-0 opacity-10">
-          <img src={heroImage} alt="DJ Mixer Interface" className="h-full w-full object-cover" />
-        </div>
-        <div className="relative z-10">
-          <h1 className="header-title mb-2 text-center">DJ Mixer Pro</h1>
-          <p className="text-center text-sm text-muted-foreground">
-            Reproducción vía YouTube • Contenido sin modificar • Uso bajo Política de YouTube
-          </p>
-        </div>
+        <h1 className="header-title mb-2 text-center">DJ Mixer Pro</h1>
+        <p className="text-center text-sm text-muted-foreground">
+          Reproducción vía YouTube • Contenido sin modificar • Uso bajo Política de YouTube
+        </p>
       </motion.div>
 
       {/* Layout principal */}
