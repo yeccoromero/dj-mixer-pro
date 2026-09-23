@@ -51,6 +51,14 @@ global entre componentes: toda la comunicación pasa por `DJMixer.tsx`.
 |---|---|
 | Texto "DJ Mixer Pro" + imagen hero | Puramente decorativo, sin interacción. |
 
+**Tipografía pixel/8-bit, solo acá:** a partir de una imagen de referencia con un título estilo
+videojuego retro ("LET'S PLAY. TOGETHER"), se le dio al título principal la fuente
+[Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P) (Google Fonts), en mayúsculas.
+Pedido explícito: "solo eso en la parte superior, nada más" — así que se creó una clase nueva y
+separada (`.header-title` en `index.css`) en vez de tocar `.music-title`, que sigue usando Inter y
+también la usa el título del modal "Agregar pista" — cambiarla ahí habría afectado el modal, no
+solo el header.
+
 ---
 
 ## Panel de efectos (`EffectsPanel.tsx`)

@@ -160,7 +160,7 @@ export const DJMixer: React.FC = () => {
           <img src={heroImage} alt="DJ Mixer Interface" className="h-full w-full object-cover" />
         </div>
         <div className="relative z-10">
-          <h1 className="music-title mb-2 text-center">DJ Mixer Pro</h1>
+          <h1 className="header-title mb-2 text-center">DJ Mixer Pro</h1>
           <p className="text-center text-sm text-muted-foreground">
             Reproducción vía YouTube • Contenido sin modificar • Uso bajo Política de YouTube
           </p>
