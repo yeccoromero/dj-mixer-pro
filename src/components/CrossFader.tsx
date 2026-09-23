@@ -55,9 +55,10 @@ export const CrossFader: React.FC<CrossFaderProps> = ({ value, onChange }) => {
       },
       onDrag: reportFromX,
       onThrowUpdate: reportFromX,
-      onRelease: () => {
-        isDraggingRef.current = false
-      },
+      // isDraggingRef only clears once the inertia coast actually settles (onThrowComplete),
+      // not on release — see the identical note in VerticalFader.tsx: clearing it on release
+      // let the external-sync effect start its own gsap.to() on the same property while
+      // GSAP's own throw tween was still running, and the two fought over the handle.
       onThrowComplete: () => {
         isDraggingRef.current = false
         setIsDragging(false)

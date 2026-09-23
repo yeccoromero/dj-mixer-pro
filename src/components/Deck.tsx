@@ -269,7 +269,6 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
 
   return (
     <motion.div
-      layout
       onClick={onActivate}
       className={cn(
         'deck flex flex-col gap-4 border-2 transition-colors',

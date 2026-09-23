@@ -130,6 +130,21 @@ velocidad, sigue deslizando por su cuenta y frena naturalmente en vez de detener
 soltaste el mouse. Tocar la barra (fuera de la manija) salta directo a ese punto. Las flechas del
 teclado siguen funcionando igual que antes (accesibilidad).
 
+**Bug corregido — el fader quedaba inestable/pegado tras usarlo un rato:** el flag interno que le
+dice al componente "no sincronices el valor externo mientras el usuario está arrastrando" se
+apagaba en `onRelease` (al soltar el mouse), no en `onThrowComplete` (cuando termina de verdad el
+deslizamiento de la inercia). Con `inertia: true`, soltar con velocidad sigue moviendo la manija
+un rato más por su cuenta — apagar el flag antes de que termine dejaba que el efecto de
+sincronización externa arrancara su propia animación GSAP sobre la misma manija mientras la
+inercia todavía la estaba animando. Dos animaciones peleando por la misma propiedad podían dejar
+la manija visualmente separada del valor real: los clics siguientes caían sobre una manija que ya
+no representaba el estado real y no hacían nada, lo que se sentía como que el control "se quedaba
+pegado". Se corrigió apagando el flag solo en `onThrowComplete`. El mismo patrón (y el mismo
+arreglo) existía en el `CrossFader`. De paso se sacó del `Deck` un `layout` de Framer Motion que no
+cumplía ninguna función visible y es un patrón de riesgo conocido al combinarse con un `Draggable`
+de GSAP anidado — no se confirmó que causara el problema en sí, pero no había motivo para
+mantenerlo.
+
 **Se quitó el Filter:** el knob Filter aplicaba un filtro CSS `saturate()` en vivo sobre el video
 — un efecto puramente visual, nunca de audio (el audio del embed de YouTube no es interceptable
 vía Web Audio API, así que un "filtro" de audio real nunca fue posible en esta app). Pedido

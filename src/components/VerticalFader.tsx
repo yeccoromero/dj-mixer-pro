@@ -62,9 +62,13 @@ export const VerticalFader: React.FC<VerticalFaderProps> = ({
       },
       onDrag: reportFromY,
       onThrowUpdate: reportFromY,
-      onRelease: () => {
-        isDraggingRef.current = false
-      },
+      // isDraggingRef only clears once the inertia coast actually settles (onThrowComplete),
+      // not on release — with inertia:true, letting go while still moving keeps the throw
+      // animating the handle for a bit longer. Clearing the flag on release (as this used to)
+      // let the external-sync effect below start its own gsap.to() on the same `y` property
+      // while GSAP's own throw tween was still running, and the two fought over the handle
+      // until it visibly desynced from `value` — clicks would land on a handle that had
+      // stopped actually representing the state, which read as the fader "getting stuck."
       onThrowComplete: () => {
         isDraggingRef.current = false
         setIsDragging(false)
