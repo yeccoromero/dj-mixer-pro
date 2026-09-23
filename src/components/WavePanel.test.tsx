@@ -57,20 +57,15 @@ describe('WavePanel', () => {
     expect(onSeek).toHaveBeenCalledWith(0.75) // 150 / 200
   })
 
-  it('dots beyond the played portion but within loadedFraction render as buffered', () => {
+  it('renders the buffered fill at the loadedFraction width', () => {
     const { container } = render(<WavePanel progress={0} loadedFraction={0.6} />)
-    const track = container.querySelector('.relative') as HTMLElement
-    const dots = track.querySelectorAll('span')
-    // DOT_COUNT is 32: dot 12 sits at ~38.7% (within the 60% buffered), dot 20 at ~64.5% (past it).
-    expect(dots[12]).toHaveStyle({ backgroundColor: 'rgba(0, 0, 0, 0.28)' })
-    expect(dots[20]).toHaveStyle({ backgroundColor: 'rgba(0, 0, 0, 0.12)' })
+    const fill = container.querySelector('[title="Video precargado"]') as HTMLElement
+    expect(fill).toHaveStyle({ width: '60%' })
   })
 
-  it('no dot renders as buffered when loadedFraction is omitted', () => {
+  it('does not render a buffered fill when loadedFraction is omitted', () => {
     const { container } = render(<WavePanel progress={0} />)
-    const track = container.querySelector('.relative') as HTMLElement
-    const dots = track.querySelectorAll('span')
-    expect(dots[20]).toHaveStyle({ backgroundColor: 'rgba(0, 0, 0, 0.12)' })
+    expect(container.querySelector('[title="Video precargado"]')).not.toBeInTheDocument()
   })
 
   it('renders the cue marker at the given position, as a small dot (no full-height line)', () => {
@@ -81,13 +76,13 @@ describe('WavePanel', () => {
     expect(marker.className).not.toContain('h-full')
   })
 
-  it('dots up to the progress ratio light up in the accent color, the rest stay dim', () => {
+  it('the played portion is a growing fill (width), not a line at a point (left)', () => {
     const { container } = render(<WavePanel progress={0.4} />)
     const track = container.querySelector('.relative') as HTMLElement
-    const dots = track.querySelectorAll('span')
-    // DOT_COUNT is 32: dot 12 sits at ~38.7% (played), dot 13 at ~41.9% (not played yet).
-    expect(dots[12]).toHaveStyle({ backgroundColor: '#d7ff43' })
-    expect(dots[13]).toHaveStyle({ backgroundColor: 'rgba(0, 0, 0, 0.12)' })
+    // First child of the track is the played fill (loadedFraction wasn't passed here).
+    const fill = track.firstElementChild as HTMLElement
+    expect(fill).toHaveStyle({ width: '40%' })
+    expect(fill.className).not.toMatch(/\bw-0\.5\b/)
   })
 
   it('the track grows taller on hover and shrinks back on mouse leave', () => {
