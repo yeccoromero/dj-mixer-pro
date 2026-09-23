@@ -57,15 +57,20 @@ describe('WavePanel', () => {
     expect(onSeek).toHaveBeenCalledWith(0.75) // 150 / 200
   })
 
-  it('renders the buffered fill at the loadedFraction width', () => {
+  it('dots beyond the played portion but within loadedFraction render as buffered', () => {
     const { container } = render(<WavePanel progress={0} loadedFraction={0.6} />)
-    const fill = container.querySelector('[title="Video precargado"]') as HTMLElement
-    expect(fill).toHaveStyle({ width: '60%' })
+    const track = container.querySelector('.relative') as HTMLElement
+    const dots = track.querySelectorAll('span')
+    // DOT_COUNT is 32: dot 12 sits at ~38.7% (within the 60% buffered), dot 20 at ~64.5% (past it).
+    expect(dots[12]).toHaveStyle({ backgroundColor: 'rgba(0, 0, 0, 0.28)' })
+    expect(dots[20]).toHaveStyle({ backgroundColor: 'rgba(0, 0, 0, 0.12)' })
   })
 
-  it('does not render a buffered fill when loadedFraction is omitted', () => {
+  it('no dot renders as buffered when loadedFraction is omitted', () => {
     const { container } = render(<WavePanel progress={0} />)
-    expect(container.querySelector('[title="Video precargado"]')).not.toBeInTheDocument()
+    const track = container.querySelector('.relative') as HTMLElement
+    const dots = track.querySelectorAll('span')
+    expect(dots[20]).toHaveStyle({ backgroundColor: 'rgba(0, 0, 0, 0.12)' })
   })
 
   it('renders the cue marker at the given position, as a small dot (no full-height line)', () => {
@@ -76,13 +81,13 @@ describe('WavePanel', () => {
     expect(marker.className).not.toContain('h-full')
   })
 
-  it('the played portion is a growing fill (width), not a line at a point (left)', () => {
+  it('dots up to the progress ratio light up in the accent color, the rest stay dim', () => {
     const { container } = render(<WavePanel progress={0.4} />)
     const track = container.querySelector('.relative') as HTMLElement
-    // First child of the track is the played fill (loadedFraction wasn't passed here).
-    const fill = track.firstElementChild as HTMLElement
-    expect(fill).toHaveStyle({ width: '40%' })
-    expect(fill.className).not.toMatch(/\bw-0\.5\b/)
+    const dots = track.querySelectorAll('span')
+    // DOT_COUNT is 32: dot 12 sits at ~38.7% (played), dot 13 at ~41.9% (not played yet).
+    expect(dots[12]).toHaveStyle({ backgroundColor: '#d7ff43' })
+    expect(dots[13]).toHaveStyle({ backgroundColor: 'rgba(0, 0, 0, 0.12)' })
   })
 
   it('the track grows taller on hover and shrinks back on mouse leave', () => {

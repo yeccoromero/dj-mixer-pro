@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { gsap, Draggable } from '@/lib/gsapSetup'
 import { cn } from '@/lib/utils'
 
+const DOT_COUNT = 12
+
 interface VerticalFaderProps {
   label: string
   value: number // 0-100, 0 = bottom, 100 = top (like a real mixer channel fader)
@@ -109,6 +111,10 @@ export const VerticalFader: React.FC<VerticalFaderProps> = ({
   }
 
   const accentColor = accent === 'lime' ? 'hsl(var(--lime-accent))' : 'hsl(var(--aqua-accent))'
+  // A column of beads instead of a solid fill — each one lit up in the deck's color once the
+  // fader passes it. Same "dot-matrix" language as the LED time readouts (DotGothic16), so the
+  // fader reads as part of the same instrument instead of a plain progress bar.
+  const dots = Array.from({ length: DOT_COUNT }, (_, i) => value >= 100 * (1 - i / (DOT_COUNT - 1)))
 
   return (
     <div className={cn('flex flex-col items-center gap-1.5 select-none', fill && 'h-full')}>
@@ -130,11 +136,15 @@ export const VerticalFader: React.FC<VerticalFaderProps> = ({
         className={cn('knob relative w-3 cursor-pointer touch-none', fill && 'flex-1')}
         style={fill ? undefined : { height }}
       >
-        <div
-          className="pointer-events-none absolute bottom-0 left-0 w-full rounded-full"
-          style={{ height: `${value}%`, backgroundColor: accentColor }}
-          aria-hidden="true"
-        />
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-between py-1" aria-hidden="true">
+          {dots.map((lit, i) => (
+            <span
+              key={i}
+              className="h-1 w-1 rounded-full transition-colors duration-150"
+              style={{ backgroundColor: lit ? accentColor : 'rgba(0, 0, 0, 0.15)' }}
+            />
+          ))}
+        </div>
         <div
           ref={handleRef}
           className={cn(

@@ -184,6 +184,19 @@ transición corta — el mismo patrón de "aparece al interactuar" que usa el bu
 punto de cue guardado pasó de una línea blanca de altura completa a un puntito chico (círculo de
 6px), para que no se lea como otra "línea vertical".
 
+**Rediseño — de relleno continuo a puntos ("Music OS", inspirado en widgets estilo Braun):** a
+partir de una imagen de referencia de widgets minimalistas (reloj, clima, reproductor de música,
+todos con barras de progreso hechas de puntos en vez de una línea o relleno sólido), se adoptó ese
+mismo lenguaje acá: tanto la barra de posición (`WavePanel.tsx`) como los faders de Gain
+(`VerticalFader.tsx`) reemplazaron su relleno continuo por una fila/columna de puntos que se van
+"encendiendo" en el color del deck a medida que avanza la reproducción o sube el gain — los puntos
+detrás del precargado (`loadedFraction`) quedan en un gris intermedio, y el resto en gris claro.
+No es un capricho estético aislado: la app ya usaba una tipografía LED de puntos (`DotGothic16`)
+para los contadores de tiempo, así que este cambio conecta ese motivo con los controles
+interactivos — toda la interfaz "habla el mismo idioma" de puntos en vez de mezclar dos lenguajes
+visuales distintos (líneas continuas para los controles, puntos solo para los números). La
+interacción (click, arrastre, teclado, hover-reveal del handle) no cambió — es puramente visual.
+
 **¿Qué son Gain y Cue, en términos simples?**
 - **Gain** = qué tan fuerte suena ese deck. Se multiplica con la posición del crossfader: si el
   crossfader está del lado del otro deck, aunque el Gain esté al máximo no se va a escuchar nada.

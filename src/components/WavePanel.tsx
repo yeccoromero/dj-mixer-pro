@@ -5,6 +5,11 @@ const THUMB_TRANSITION = 'width 120ms ease, height 120ms ease, opacity 120ms eas
 const THIN_HEIGHT = 4
 const EXPANDED_HEIGHT = 6
 const THUMB_SIZE = 12
+// A row of beads instead of a solid fill — same "dot-matrix" language as the LED time readouts
+// (DotGothic16) and the Gain faders, so the whole deck reads as one instrument.
+const DOT_COUNT = 32
+const DOT_COLOR_EMPTY = 'rgba(0, 0, 0, 0.12)'
+const DOT_COLOR_BUFFERED = 'rgba(0, 0, 0, 0.28)'
 
 interface WavePanelProps {
   progress: number // 0-1
@@ -26,11 +31,11 @@ interface WavePanelProps {
 }
 
 /**
- * The deck's playback-position bar, styled after YouTube's own seek bar: thin at rest,
- * a colored fill (not a line) that grows as the video plays, a gray fill showing how much
- * has buffered, and a round handle that only appears — growing in — on hover or while
- * dragging. There's no real waveform data available for a YouTube embed, so this
- * deliberately doesn't try to fake one.
+ * The deck's playback-position bar: a row of beads that light up in the deck's color as the
+ * video plays (darker beads mark what's buffered ahead of that), plus a round handle that only
+ * appears — growing in — on hover or while dragging, same reveal YouTube's own seek bar uses.
+ * There's no real waveform data available for a YouTube embed, so this deliberately doesn't
+ * try to fake one.
  */
 export const WavePanel: React.FC<WavePanelProps> = ({
   progress,
@@ -96,26 +101,22 @@ export const WavePanel: React.FC<WavePanelProps> = ({
     >
       <div
         ref={trackRef}
-        className="relative w-full rounded-full bg-black/10 transition-[height] duration-150"
+        className="relative flex w-full items-center justify-between transition-[height] duration-150"
         style={{ height: isExpanded ? EXPANDED_HEIGHT : THIN_HEIGHT }}
       >
-        {typeof loadedFraction === 'number' && (
-          <div
-            className="pointer-events-none absolute inset-y-0 left-0 rounded-full bg-black/25"
-            style={{ width: `${clampPercent(loadedFraction)}%` }}
-            title="Video precargado"
-            aria-hidden="true"
-          />
-        )}
-        <div
-          className="pointer-events-none absolute inset-y-0 left-0 rounded-full"
-          style={{
-            width: `${displayedProgress}%`,
-            backgroundColor: fillColor,
-            transition: fillTransition,
-          }}
-          aria-hidden="true"
-        />
+        {Array.from({ length: DOT_COUNT }, (_, i) => {
+          const dotRatio = (i / (DOT_COUNT - 1)) * 100
+          const played = dotRatio <= displayedProgress
+          const buffered = !played && typeof loadedFraction === 'number' && dotRatio <= clampPercent(loadedFraction)
+          return (
+            <span
+              key={i}
+              className="pointer-events-none h-1 w-1 rounded-full transition-colors duration-150"
+              style={{ backgroundColor: played ? fillColor : buffered ? DOT_COLOR_BUFFERED : DOT_COLOR_EMPTY }}
+              aria-hidden="true"
+            />
+          )
+        })}
         {typeof cueProgress === 'number' && (
           <div
             className="pointer-events-none absolute top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-1 ring-black/30"
