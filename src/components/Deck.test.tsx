@@ -76,6 +76,9 @@ function baseState(overrides: Partial<DeckState> = {}): DeckState {
     volume: 100,
     gain: 100,
     cue: 25,
+    loopIn: null,
+    loopOut: null,
+    loopActive: false,
     track,
     ...overrides,
   }
@@ -217,6 +220,61 @@ describe('Deck', () => {
     expect(onStateChange).toHaveBeenCalled()
     const updater = onStateChange.mock.calls[onStateChange.mock.calls.length - 1][0] as (s: DeckState) => DeckState
     expect(updater(baseState({ cue: 63 })).cue).toBe(0)
+  })
+
+  it('LOOP: first tap marks loopIn at the current position', async () => {
+    mockPlayer.getCurrentTime.mockReturnValue(40) // 20% of the 200s track
+    const { onStateChange } = await renderReadyDeck(baseState())
+    fireEvent.click(screen.getByText('Loop'))
+
+    expect(onStateChange).toHaveBeenCalled()
+    const updater = onStateChange.mock.calls[onStateChange.mock.calls.length - 1][0] as (s: DeckState) => DeckState
+    const next = updater(baseState())
+    expect(next.loopIn).toBe(20)
+    expect(next.loopOut).toBe(null)
+    expect(next.loopActive).toBe(false)
+  })
+
+  it('LOOP: second tap marks loopOut and activates the loop', async () => {
+    mockPlayer.getCurrentTime.mockReturnValue(100) // 50% of the 200s track
+    const { onStateChange } = await renderReadyDeck(baseState({ loopIn: 20 }))
+    fireEvent.click(screen.getByText('Loop'))
+
+    const updater = onStateChange.mock.calls[onStateChange.mock.calls.length - 1][0] as (s: DeckState) => DeckState
+    const next = updater(baseState({ loopIn: 20 }))
+    expect(next.loopIn).toBe(20)
+    expect(next.loopOut).toBe(50)
+    expect(next.loopActive).toBe(true)
+  })
+
+  it('LOOP: a second tap too close to loopIn is ignored instead of activating a useless loop', async () => {
+    mockPlayer.getCurrentTime.mockReturnValue(40) // same 20% as loopIn — zero-length loop
+    const { onStateChange } = await renderReadyDeck(baseState({ loopIn: 20 }))
+    fireEvent.click(screen.getByText('Loop'))
+
+    expect(onStateChange).not.toHaveBeenCalled()
+  })
+
+  it('LOOP: a third tap, while active, clears both points and deactivates', async () => {
+    const { onStateChange } = await renderReadyDeck(baseState({ loopIn: 20, loopOut: 50, loopActive: true }))
+    fireEvent.click(screen.getByText('Loop'))
+
+    const updater = onStateChange.mock.calls[onStateChange.mock.calls.length - 1][0] as (s: DeckState) => DeckState
+    const next = updater(baseState({ loopIn: 20, loopOut: 50, loopActive: true }))
+    expect(next.loopIn).toBe(null)
+    expect(next.loopOut).toBe(null)
+    expect(next.loopActive).toBe(false)
+  })
+
+  it('LOOP: while active and playing, crossing loopOut seeks back to loopIn instead of continuing past it', async () => {
+    vi.useFakeTimers()
+    mockPlayer.getCurrentTime.mockReturnValue(101) // just past loopOut (50% = 100s)
+    await renderReadyDeck(baseState({ isPlaying: true, loopIn: 20, loopOut: 50, loopActive: true }))
+
+    vi.advanceTimersByTime(250) // crosses POLL_INTERVAL_MS (200ms)
+
+    expect(mockPlayer.seekTo).toHaveBeenCalledWith(40, true) // loopIn 20% * 200s
+    vi.useRealTimers()
   })
 
   it('seeking via the waveform moves the real player and updates currentTime immediately', async () => {

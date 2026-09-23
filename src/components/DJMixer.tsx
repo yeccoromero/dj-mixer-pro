@@ -22,6 +22,11 @@ export interface DeckState {
   volume: number
   gain: number
   cue: number
+  /** 0-100% loop bounds. `loopIn` alone means "armed, waiting for the out point"; both set
+   * means active — see the 3-tap LOOP button in Deck.tsx. */
+  loopIn: number | null
+  loopOut: number | null
+  loopActive: boolean
   track: Track | null
 }
 
@@ -65,6 +70,9 @@ const createInitialDeckState = (track: Track | null): DeckState => ({
   // this deck; the knob can still be pulled down from there like any real gain trim.
   gain: 100,
   cue: 0,
+  loopIn: null,
+  loopOut: null,
+  loopActive: false,
   track,
 })
 
@@ -98,10 +106,12 @@ export const DJMixer: React.FC = () => {
 
   const handleTrackSelect = (track: Track) => {
     setSelectedTrack(track)
+    // A loop's in/out points are percentages of the *previous* track's duration — meaningless
+    // (and possibly instantly re-triggering) once a different track loads, so it clears too.
     if (activeDeck === 'A') {
-      setDeckA((prev) => ({ ...prev, track, currentTime: 0 }))
+      setDeckA((prev) => ({ ...prev, track, currentTime: 0, loopIn: null, loopOut: null, loopActive: false }))
     } else {
-      setDeckB((prev) => ({ ...prev, track, currentTime: 0 }))
+      setDeckB((prev) => ({ ...prev, track, currentTime: 0, loopIn: null, loopOut: null, loopActive: false }))
     }
   }
 
@@ -120,8 +130,16 @@ export const DJMixer: React.FC = () => {
       return updatedTracks
     })
     setSelectedTrack((prev) => (prev?.id === trackId ? null : prev))
-    setDeckA((prev) => (prev.track?.id === trackId ? { ...prev, track: null, isPlaying: false, currentTime: 0 } : prev))
-    setDeckB((prev) => (prev.track?.id === trackId ? { ...prev, track: null, isPlaying: false, currentTime: 0 } : prev))
+    setDeckA((prev) =>
+      prev.track?.id === trackId
+        ? { ...prev, track: null, isPlaying: false, currentTime: 0, loopIn: null, loopOut: null, loopActive: false }
+        : prev,
+    )
+    setDeckB((prev) =>
+      prev.track?.id === trackId
+        ? { ...prev, track: null, isPlaying: false, currentTime: 0, loopIn: null, loopOut: null, loopActive: false }
+        : prev,
+    )
   }
 
   const handleEffectTrigger = (effect: EffectId) => {

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Play, Pause, Disc3, AlertTriangle, RotateCcw } from 'lucide-react'
+import { Play, Pause, Disc3, AlertTriangle, RotateCcw, Repeat } from 'lucide-react'
 import type { DeckState } from './DJMixer'
 import { VerticalFader } from './VerticalFader'
 import { WavePanel } from './WavePanel'
@@ -37,6 +37,10 @@ const POLL_INTERVAL_MS = 200
 // foreground to the effect without going all the way to silence (still recognizably "the
 // track, just quieter," not a hard mute).
 const DUCK_FACTOR = 0.3
+// A second LOOP tap closer than this to the in point would activate an imperceptibly short
+// (or, at 0, infinitely-retriggering) loop — ignored instead, so the button just keeps
+// waiting for a real out point.
+const MIN_LOOP_PERCENT = 1
 
 export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, onActivate, onDurationResolved, ducking = false }) => {
   const containerId = `yt-player-${id}`
@@ -145,19 +149,51 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
     }
   }, [state.volume, state.gain, ready, ducking])
 
-  // Poll playback position for the waveform / timeline.
+  // The playhead line glides smoothly between poll updates during normal playback (see
+  // WavePanel) — but an explicit seek is a deliberate jump, not a small forward step, so it
+  // needs to land instantly instead of visibly sliding there. Turning the transition off for
+  // exactly one paint (via a double rAF, so the browser commits the "no transition" style
+  // before the new position applies) and back on again gets both behaviors from one line.
+  const [smoothPlayhead, setSmoothPlayhead] = useState(true)
+
+  /** Seeks the real player AND updates `currentTime` immediately, so the LED counters and
+   * waveform reflect the new position right away — the poll below only runs while playing,
+   * so without this a seek while paused would look like it silently did nothing. */
+  const seekAndSync = (seconds: number) => {
+    if (!playerRef.current) return
+    playerRef.current.seekTo(seconds, true)
+    setSmoothPlayhead(false)
+    onStateChange((prev) => ({ ...prev, currentTime: seconds }))
+    requestAnimationFrame(() => requestAnimationFrame(() => setSmoothPlayhead(true)))
+  }
+
+  // Poll playback position for the waveform / timeline — and, while a loop is active, jump
+  // back to loopIn the instant playback crosses loopOut, so the loop repeats seamlessly
+  // instead of needing a separate "did we pass the end" effect layered on top.
   useEffect(() => {
     if (pollRef.current) window.clearInterval(pollRef.current)
     pollRef.current = window.setInterval(() => {
       if (playerRef.current && state.isPlaying) {
         const currentTime = playerRef.current.getCurrentTime()
+        if (state.loopActive && state.loopOut !== null && state.loopIn !== null && state.track) {
+          const loopOutSeconds = (state.loopOut / 100) * state.track.duration
+          if (currentTime >= loopOutSeconds) {
+            seekAndSync((state.loopIn / 100) * state.track.duration)
+            return
+          }
+        }
         onStateChange((prev) => (prev.isPlaying ? { ...prev, currentTime } : prev))
       }
     }, POLL_INTERVAL_MS)
     return () => {
       if (pollRef.current) window.clearInterval(pollRef.current)
     }
-  }, [state.isPlaying, onStateChange])
+    // seekAndSync is intentionally excluded: it's a plain function recreated every render, but
+    // its behavior only depends on playerRef (a ref) and onStateChange (already listed) — adding
+    // it would just tear down and restart this interval on every render (including every poll
+    // tick's own state update) instead of only when something here actually changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.isPlaying, state.loopActive, state.loopIn, state.loopOut, state.track, onStateChange])
 
   // How much of the video has actually buffered — the real signal behind the "preload"
   // fill on the position bar (see WavePanel). Buffering can keep progressing even while
@@ -180,24 +216,6 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
     } else {
       playerRef.current.playVideo()
     }
-  }
-
-  // The playhead line glides smoothly between poll updates during normal playback (see
-  // WavePanel) — but an explicit seek is a deliberate jump, not a small forward step, so it
-  // needs to land instantly instead of visibly sliding there. Turning the transition off for
-  // exactly one paint (via a double rAF, so the browser commits the "no transition" style
-  // before the new position applies) and back on again gets both behaviors from one line.
-  const [smoothPlayhead, setSmoothPlayhead] = useState(true)
-
-  /** Seeks the real player AND updates `currentTime` immediately, so the LED counters and
-   * waveform reflect the new position right away — the poll below only runs while playing,
-   * so without this a seek while paused would look like it silently did nothing. */
-  const seekAndSync = (seconds: number) => {
-    if (!playerRef.current) return
-    playerRef.current.seekTo(seconds, true)
-    setSmoothPlayhead(false)
-    onStateChange((prev) => ({ ...prev, currentTime: seconds }))
-    requestAnimationFrame(() => requestAnimationFrame(() => setSmoothPlayhead(true)))
   }
 
   // Both read via refs (not `state`/`ready` directly) so they're safe to call from the
@@ -277,10 +295,40 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
     seekAndSync(ratio * state.track.duration)
   }
 
+  /** A single LOOP button cycles through the three states a DJ loop needs, without any
+   * separate "set in" / "set out" / "activate" controls to explain:
+   *   1st tap (idle):   marks loopIn at wherever the track is right now.
+   *   2nd tap (armed):  marks loopOut there and activates the loop — the poll effect above
+   *                      then jumps back to loopIn every time playback crosses loopOut.
+   *   3rd tap (active): clears both points and returns to idle, playback continues normally.
+   * Taps that would produce a loop shorter than MIN_LOOP_PERCENT are ignored (stays armed,
+   * waiting for a real out point) instead of activating a loop too short to be useful. */
+  const handleLoopTap = () => {
+    if (!playerRef.current || !ready || !state.track) return
+    if (state.loopActive) {
+      onStateChange((prev) => ({ ...prev, loopIn: null, loopOut: null, loopActive: false }))
+      return
+    }
+    const percent = computeCuePercent(playerRef.current.getCurrentTime(), state.track.duration)
+    if (state.loopIn === null) {
+      onStateChange((prev) => ({ ...prev, loopIn: percent }))
+      return
+    }
+    const loopIn = Math.min(state.loopIn, percent)
+    const loopOut = Math.max(state.loopIn, percent)
+    if (loopOut - loopIn < MIN_LOOP_PERCENT) return
+    onStateChange((prev) => ({ ...prev, loopIn, loopOut, loopActive: true }))
+  }
+
   const duration = state.track?.duration ?? 1
   const progress = duration > 0 ? state.currentTime / duration : 0
   const color = accent[id]
   const ledClass = id === 'A' ? 'led-display-lime' : 'led-display-aqua'
+  const loopTitle = state.loopActive
+    ? 'Loop activo — toca para desactivarlo'
+    : state.loopIn !== null
+      ? 'Toca para marcar la salida del loop y activarlo'
+      : 'Toca para marcar la entrada del loop'
 
   return (
     <motion.div
@@ -345,6 +393,8 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
         progress={progress}
         accent={color}
         cueProgress={state.track ? state.cue / 100 : undefined}
+        loopInProgress={state.track && state.loopIn !== null ? state.loopIn / 100 : undefined}
+        loopOutProgress={state.track && state.loopOut !== null ? state.loopOut / 100 : undefined}
         loadedFraction={state.track ? loadedFraction : undefined}
         smoothPlayhead={smoothPlayhead}
         onSeek={handleWaveformSeek}
@@ -401,6 +451,20 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
           className="knob flex h-8 w-8 items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
         >
           <RotateCcw className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          disabled={!ready || !state.track}
+          title={loopTitle}
+          onClick={handleLoopTap}
+          className={cn(
+            'knob flex h-8 items-center justify-center gap-1 px-3 text-[10px] font-semibold uppercase disabled:cursor-not-allowed disabled:opacity-40',
+            state.loopActive && (id === 'A' ? 'bg-lime-accent text-black' : 'bg-aqua-accent text-black'),
+            !state.loopActive && state.loopIn !== null && (id === 'A' ? 'ring-2 ring-lime-accent' : 'ring-2 ring-aqua-accent'),
+          )}
+        >
+          <Repeat className="h-3 w-3" />
+          Loop
         </button>
       </div>
     </motion.div>

@@ -2,9 +2,9 @@ import React, { useEffect, useRef, useState } from 'react'
 
 const FILL_TRANSITION_MS = 260
 const THUMB_TRANSITION = 'width 120ms ease, height 120ms ease, opacity 120ms ease'
-// 40% thicker than the original 4/6px, per explicit request.
-const THIN_HEIGHT = 5.6
-const EXPANDED_HEIGHT = 8.4
+// Original was 4/6px; +40% (5.6/8.4), then +30% more on top, per explicit request.
+const THIN_HEIGHT = 7.28
+const EXPANDED_HEIGHT = 10.92
 const THUMB_SIZE = 12
 
 interface WavePanelProps {
@@ -12,6 +12,10 @@ interface WavePanelProps {
   accent?: 'lime' | 'aqua'
   /** 0-1 position of the saved cue point, drawn as a small dot on the track. */
   cueProgress?: number
+  /** 0-1 positions of the loop in/out points, drawn as small dots in the deck's accent
+   * color (distinct from the white cue dot) — present while a loop is armed or active. */
+  loopInProgress?: number
+  loopOutProgress?: number
   /** 0-1 fraction of the video actually buffered so far (`player.getVideoLoadedFraction()`),
    * drawn as a gray fill ahead of playback — the same "preload" cue YouTube's own bar
    * shows. Omit to skip the fill entirely. */
@@ -37,6 +41,8 @@ export const WavePanel: React.FC<WavePanelProps> = ({
   progress,
   accent = 'lime',
   cueProgress,
+  loopInProgress,
+  loopOutProgress,
   loadedFraction,
   smoothPlayhead = true,
   onSeek,
@@ -122,6 +128,22 @@ export const WavePanel: React.FC<WavePanelProps> = ({
             className="pointer-events-none absolute top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-1 ring-black/30"
             style={{ left: `${clampPercent(cueProgress)}%` }}
             title="Punto de cue marcado"
+            aria-hidden="true"
+          />
+        )}
+        {typeof loopInProgress === 'number' && (
+          <div
+            className="pointer-events-none absolute top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-1 ring-black/30"
+            style={{ left: `${clampPercent(loopInProgress)}%`, backgroundColor: fillColor }}
+            title="Entrada del loop"
+            aria-hidden="true"
+          />
+        )}
+        {typeof loopOutProgress === 'number' && (
+          <div
+            className="pointer-events-none absolute top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-1 ring-black/30"
+            style={{ left: `${clampPercent(loopOutProgress)}%`, backgroundColor: fillColor }}
+            title="Salida del loop"
             aria-hidden="true"
           />
         )}
