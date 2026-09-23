@@ -55,15 +55,29 @@ global entre componentes: toda la comunicación pasa por `DJMixer.tsx`.
 
 ## Panel de efectos (`EffectsPanel.tsx`)
 
-| Botón | Qué hace al hacer clic |
+| Botón | Qué hace mientras se lo mantiene presionado |
 |---|---|
-| **Siren** | Barrido de sirena (500↔1100Hz, sostenido) con un leve vibrato, y llama a `onEffectTrigger('siren')` |
-| **Airhorn** | Dos notas de bocina en un sintetizador de onda sawtooth, con chorus + distorsión para el clásico "BWAAAH" |
-| **Laser** | Barrido agudo→grave corto (onda cuadrada) con una cola de ping-pong delay |
-| **Radio** | Ruido filtrado en banda pasante, con un bitcrusher adelante para la crepitación de baja fidelidad de una radio real |
+| **Siren** | Sirena sostenida (arranca en 500↔1100Hz) con vibrato — cada ciclo que pasa mientras se sigue presionando es más rápido y llega más agudo, cada vez más "escandalosa", hasta un tope (2000Hz, 180ms por ciclo) para que no termine siendo un pitido inaudible o un chillido eterno |
+| **Airhorn** | Bocina de dos notas (sawtooth + chorus + distorsión) que suena mientras se sostiene el botón, como una bocina real — no un golpe de duración fija |
+| **Laser** | Dispara ráfagas repetidas (~7 por segundo) con variación aleatoria de tono mientras se sostiene, cada una con su cola de ping-pong delay — una pistola láser, no un solo "pew" |
+| **Radio** | Ruido filtrado continuo mientras se sostiene, con la frecuencia del filtro pasa-banda "derivando" cada medio segundo (como sintonizar el dial) y un bitcrusher adelante para la crepitación de baja fidelidad |
 
-Los 4 botones comparten la misma lógica (`trigger(effect)`): reproducen el sonido y aplican una
-animación de "flash" de 350ms en el propio botón. Son autocontenidos, no dependen de estado global.
+Los 4 botones comparten la misma lógica de sostener/soltar (`startEffect`/`stopEffect`
+en `lib/effectSounds.ts`): al presionar arrancan el sonido y llaman a `onEffectTrigger(id)`; al
+soltar — detectado con un listener global de `pointerup`/`pointercancel`, igual que el botón CUE
+de cada deck, así funciona aunque el puntero se mueva fuera del botón antes de soltar — cada uno
+resuelve su propio final (la sirena hace un último barrido descendente, el airhorn suelta su
+envolvente, el láser y la radio simplemente cortan su repetición) antes de descartar sus nodos de
+audio. El botón se ilumina mientras está sostenido y se apaga al soltar.
+
+**Ajuste — de un solo golpe a mantener presionado:** la primera versión de estos efectos era
+"tocar = un sonido de duración fija", sin relación con cuánto tiempo se mantuviera el dedo/mouse
+sobre el botón. Pedido explícito: que funcionen "como un DJ al aplastar" — sostener el botón debía
+cambiar el sonido (la sirena, más aguda y escandalosa cuanto más se sostiene) y el láser/la radio
+directamente "no tenían efecto" al mantenerlos porque no había ningún comportamiento ligado a
+sostener, solo al tocar. Se separó `playEffect(effect)` (un solo disparo) en `startEffect(effect)`
+/ `stopEffect(effect)`, con cada efecto manteniendo su propio estado vivo (nodos de Tone.js +
+temporizadores) entre el press y el release.
 
 **Motor de audio — Tone.js en vez de Web Audio API a mano:** la versión anterior armaba cada
 efecto con osciladores y nodos de ganancia creados directamente (`AudioContext.createOscillator`,
