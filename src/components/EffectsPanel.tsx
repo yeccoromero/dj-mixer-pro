@@ -5,6 +5,9 @@ import { startEffect, stopEffect, type EffectId } from '@/lib/effectSounds'
 
 interface EffectsPanelProps {
   onEffectTrigger: (effect: EffectId) => void
+  /** True while any FX pad is held, false once it's released — lets the decks duck their
+   * track volume so the effect reads as louder than the music, not buried under it. */
+  onDuckingChange?: (active: boolean) => void
 }
 
 // Each effect gets its own flat retro color (bold, physical-keycap look — like the covers/
@@ -26,11 +29,15 @@ const EFFECTS: {
   { id: 'radio', label: 'Radio', icon: Radio, bg: '#E3A83B', base: '#A97527', fg: '#1A1A1A' },
 ]
 
-export const EffectsPanel: React.FC<EffectsPanelProps> = ({ onEffectTrigger }) => {
+export const EffectsPanel: React.FC<EffectsPanelProps> = ({ onEffectTrigger, onDuckingChange }) => {
   const [activeEffect, setActiveEffect] = useState<EffectId | null>(null)
   // Read from the pointerup listener below, which is registered once at mount and would
   // otherwise close over a stale `activeEffect` forever.
   const activeEffectRef = useRef<EffectId | null>(null)
+  const onDuckingChangeRef = useRef(onDuckingChange)
+  useEffect(() => {
+    onDuckingChangeRef.current = onDuckingChange
+  }, [onDuckingChange])
 
   // Like a real DJ FX pad: the effect sounds for as long as the button is held, and the
   // release has to be caught wherever the pointer ends up — even if it drifted off the
@@ -43,6 +50,7 @@ export const EffectsPanel: React.FC<EffectsPanelProps> = ({ onEffectTrigger }) =
       activeEffectRef.current = null
       setActiveEffect(null)
       stopEffect(effect)
+      onDuckingChangeRef.current?.(false)
     }
     window.addEventListener('pointerup', release)
     window.addEventListener('pointercancel', release)
@@ -56,11 +64,13 @@ export const EffectsPanel: React.FC<EffectsPanelProps> = ({ onEffectTrigger }) =
     if (activeEffectRef.current === effect) return
     // A stray second pointerdown landing on a different pad before the first one's release
     // fired stops that one first, instead of leaving it sounding forever underneath the new one.
+    const wasAlreadyHoldingOne = activeEffectRef.current !== null
     if (activeEffectRef.current) stopEffect(activeEffectRef.current)
     activeEffectRef.current = effect
     setActiveEffect(effect)
     startEffect(effect)
     onEffectTrigger(effect)
+    if (!wasAlreadyHoldingOne) onDuckingChangeRef.current?.(true)
   }
 
   return (

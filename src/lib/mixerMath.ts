@@ -20,11 +20,13 @@ export function computeCrossfaderVolumes(crossFaderValue: number): { volumeA: nu
 }
 
 /**
- * Combines the crossfader-derived deck volume with the deck's own gain
- * knob into the single 0-100 value sent to the YouTube player.
+ * Combines the crossfader-derived deck volume with the deck's own gain knob into the single
+ * 0-100 value sent to the YouTube player. `duckFactor` (0-1, defaults to 1 = no change) scales
+ * the result down further — used to duck the track while an FX pad is held, so the effect
+ * reads as louder than the music regardless of where Gain/crossfader currently sit.
  */
-export function computeEffectiveVolume(volume: number, gain: number): number {
-  return Math.round((clamp100(volume) / 100) * (clamp100(gain) / 100) * 100)
+export function computeEffectiveVolume(volume: number, gain: number, duckFactor: number = 1): number {
+  return Math.round((clamp100(volume) / 100) * (clamp100(gain) / 100) * 100 * duckFactor)
 }
 
 /**

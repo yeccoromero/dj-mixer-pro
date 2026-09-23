@@ -66,7 +66,9 @@ function buildSiren(): LiveEffect {
     oscillator: { type: 'sine' },
     envelope: { attack: 0.05, decay: 0.1, sustain: 1, release: 0.5 },
   }).connect(vibrato)
-  synth.volume.value = -8
+  // Boosted from -8dB — combined with the track-ducking in Deck.tsx, this is what makes the
+  // effect clearly cut through the mix instead of getting buried under wherever Gain sits.
+  synth.volume.value = -3
   synth.triggerAttack(500, Tone.now())
 
   let cycle = 0
@@ -111,7 +113,7 @@ function buildAirhorn(): LiveEffect {
     oscillator: { type: 'sawtooth' },
     envelope: { attack: 0.02, decay: 0.15, sustain: 0.8, release: 0.4 },
   }).connect(chorus)
-  synth.volume.value = -6
+  synth.volume.value = -2
   synth.triggerAttack(['A2', 'A3'], Tone.now())
 
   return {
@@ -135,7 +137,7 @@ function buildLaser(): LiveEffect {
     oscillator: { type: 'square' },
     envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.05 },
   }).connect(delay)
-  synth.volume.value = -10
+  synth.volume.value = -5
 
   const fire = () => {
     const now = Tone.now()
@@ -164,7 +166,7 @@ function buildRadio(): LiveEffect {
   const filter = new Tone.Filter({ type: 'bandpass', frequency: 1200, Q: 1.5 }).toDestination()
   const crush = new Tone.BitCrusher(5).connect(filter)
   const noise = new Tone.Noise('white').connect(crush)
-  noise.volume.value = -14
+  noise.volume.value = -8
   noise.start(Tone.now())
 
   const drift = window.setInterval(() => {

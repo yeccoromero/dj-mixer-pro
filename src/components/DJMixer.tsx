@@ -83,6 +83,10 @@ export const DJMixer: React.FC = () => {
   const [crossFaderValue, setCrossFaderValue] = useState<number>(50)
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null)
   const [activeDeck, setActiveDeck] = useState<'A' | 'B'>('A')
+  // While an FX pad is held, both decks duck their track volume so the effect (a separate
+  // audio path, not something that goes through the player) reads as clearly louder than
+  // the music instead of getting buried under wherever Gain/crossfader currently sit.
+  const [ducking, setDucking] = useState(false)
 
   // Cross-fader drives each deck's output volume.
   useEffect(() => {
@@ -172,6 +176,7 @@ export const DJMixer: React.FC = () => {
             isActive={activeDeck === 'A'}
             onActivate={() => setActiveDeck('A')}
             onDurationResolved={handleDurationResolved}
+            ducking={ducking}
           />
         </div>
 
@@ -188,7 +193,7 @@ export const DJMixer: React.FC = () => {
             onRemoveTrack={handleRemoveTrack}
           />
 
-          <EffectsPanel onEffectTrigger={handleEffectTrigger} />
+          <EffectsPanel onEffectTrigger={handleEffectTrigger} onDuckingChange={setDucking} />
         </div>
 
         {/* Deck B */}
@@ -200,6 +205,7 @@ export const DJMixer: React.FC = () => {
             isActive={activeDeck === 'B'}
             onActivate={() => setActiveDeck('B')}
             onDurationResolved={handleDurationResolved}
+            ducking={ducking}
           />
         </div>
       </div>

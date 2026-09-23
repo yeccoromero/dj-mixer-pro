@@ -52,6 +52,15 @@ describe('computeEffectiveVolume', () => {
   it('multiplies the two inputs proportionally', () => {
     expect(computeEffectiveVolume(50, 50)).toBe(25)
   })
+
+  it('defaults to no ducking when duckFactor is omitted', () => {
+    expect(computeEffectiveVolume(100, 100)).toBe(computeEffectiveVolume(100, 100, 1))
+  })
+
+  it('scales the result down by duckFactor, for ducking the track under an FX pad', () => {
+    expect(computeEffectiveVolume(100, 100, 0.3)).toBe(30)
+    expect(computeEffectiveVolume(80, 50, 0.5)).toBe(20) // 80% * 50% * 100 * 0.5
+  })
 })
 
 describe('computeCuePercent', () => {

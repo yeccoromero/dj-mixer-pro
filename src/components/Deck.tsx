@@ -17,6 +17,11 @@ interface DeckProps {
   onActivate: () => void
   /** Called once the real video duration is known, so the app can replace a placeholder. */
   onDurationResolved?: (trackId: string, duration: number) => void
+  /** True while an FX pad is held — ducks this deck's track volume so the effect (which
+   * plays through its own separate Web Audio/Tone.js output, not through the player) reads
+   * as clearly louder than the music instead of getting buried under wherever Gain/crossfader
+   * currently sit. */
+  ducking?: boolean
 }
 
 const accent = { A: 'lime', B: 'aqua' } as const
@@ -28,8 +33,12 @@ const CUE_HOLD_THRESHOLD_MS = 200
 // (which glides smoothly between updates via CSS, see WavePanel) reads as continuous
 // motion rather than visible steps, without hammering the postMessage bridge to the iframe.
 const POLL_INTERVAL_MS = 200
+// How far the track gets ducked while an FX pad is held — enough to clearly cede the
+// foreground to the effect without going all the way to silence (still recognizably "the
+// track, just quieter," not a hard mute).
+const DUCK_FACTOR = 0.3
 
-export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, onActivate, onDurationResolved }) => {
+export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, onActivate, onDurationResolved, ducking = false }) => {
   const containerId = `yt-player-${id}`
   const playerRef = useRef<YouTubePlayer | null>(null)
   const [ready, setReady] = useState(false)
@@ -129,12 +138,12 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
     }
   }, [state.track?.youtubeId, ready])
 
-  // Crossfader volume combined with the gain knob.
+  // Crossfader volume combined with the gain knob, ducked while an FX pad is held.
   useEffect(() => {
     if (ready && playerRef.current) {
-      playerRef.current.setVolume(computeEffectiveVolume(state.volume, state.gain))
+      playerRef.current.setVolume(computeEffectiveVolume(state.volume, state.gain, ducking ? DUCK_FACTOR : 1))
     }
-  }, [state.volume, state.gain, ready])
+  }, [state.volume, state.gain, ready, ducking])
 
   // Poll playback position for the waveform / timeline.
   useEffect(() => {

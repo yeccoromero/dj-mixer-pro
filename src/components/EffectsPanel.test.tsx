@@ -59,4 +59,29 @@ describe('EffectsPanel', () => {
 
     expect(stopEffect).toHaveBeenCalledWith('airhorn')
   })
+
+  it('reports ducking true on press and false on release, so the decks can duck under the FX pad', () => {
+    const onDuckingChange = vi.fn()
+    render(<EffectsPanel onEffectTrigger={vi.fn()} onDuckingChange={onDuckingChange} />)
+
+    fireEvent.pointerDown(screen.getByTitle('Mantener presionado para Siren'))
+    expect(onDuckingChange).toHaveBeenCalledExactlyOnceWith(true)
+
+    fireEvent.pointerUp(window)
+    expect(onDuckingChange).toHaveBeenLastCalledWith(false)
+  })
+
+  it('switching to a different pad while one is already held does not re-report ducking (it never stopped)', () => {
+    const onDuckingChange = vi.fn()
+    render(<EffectsPanel onEffectTrigger={vi.fn()} onDuckingChange={onDuckingChange} />)
+
+    fireEvent.pointerDown(screen.getByTitle('Mantener presionado para Siren'))
+    onDuckingChange.mockClear()
+
+    fireEvent.pointerDown(screen.getByTitle('Mantener presionado para Radio'))
+    expect(onDuckingChange).not.toHaveBeenCalled()
+
+    fireEvent.pointerUp(window)
+    expect(onDuckingChange).toHaveBeenCalledExactlyOnceWith(false)
+  })
 })

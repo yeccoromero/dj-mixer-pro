@@ -118,6 +118,19 @@ documento). Cada efecto crea su propia cadena de nodos al dispararse y los desca
 un momento después de terminar de sonar — son sonidos puntuales, no instrumentos persistentes, así
 que no hay razón para que ocupen memoria una vez que terminaron.
 
+**Ducking — el efecto se escucha más fuerte que la música:** pedido explícito ("los efectos...
+deben ser más altos en sonido que el audio"). Los efectos suenan por un camino de audio
+completamente separado del video de YouTube (Tone.js/Web Audio API vs el audio nativo del iframe),
+así que no hay forma de "mezclarlos" con volúmenes relativos de verdad — pero si el Gain de ambos
+decks y el crossfader están al máximo, la pista puede sonar más fuerte que cualquier efecto por
+más que se le suba el volumen propio. Se resolvió con **ducking real**: mientras se sostiene
+cualquier botón de efecto, `DJMixer.tsx` pasa `ducking` a los dos decks, y cada uno multiplica su
+volumen efectivo por 0.3 (`DUCK_FACTOR` en `Deck.tsx`, nuevo tercer parámetro `duckFactor` de
+`computeEffectiveVolume` en `mixerMath.ts`) — la música baja a un 30%, el efecto queda al frente,
+sin importar en qué posición estén Gain o crossfader en ese momento. Al soltar, vuelve
+instantáneamente al volumen normal. De paso se subió el volumen propio de cada efecto (Tone.js,
+`synth.volume.value`) unos 5dB para reforzar el mismo objetivo desde el otro lado.
+
 **Ubicación — debajo de la Biblioteca, no arriba de todo:** vivía como una barra propia a todo lo
 ancho, entre el header y los tres paneles principales — separado del resto y sin relación visual
 con ningún otro control. Pedido explícito de moverlo debajo de Biblioteca, dentro de la misma

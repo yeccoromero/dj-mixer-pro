@@ -240,6 +240,28 @@ describe('Deck', () => {
     expect(mockPlayer.setVolume).toHaveBeenCalledWith(80) // 80 * 100 / 100
   })
 
+  it('ducks the track volume while an FX pad is held (the `ducking` prop), and restores it on release', async () => {
+    const { rerender } = render(
+      <Deck id="A" state={baseState({ volume: 100, gain: 100 })} onStateChange={vi.fn()} isActive onActivate={vi.fn()} />,
+    )
+    await act(async () => {
+      await Promise.resolve()
+    })
+    act(() => capturedEvents.onReady?.({ target: mockPlayer }))
+    mockPlayer.setVolume.mockClear()
+
+    rerender(
+      <Deck id="A" state={baseState({ volume: 100, gain: 100 })} onStateChange={vi.fn()} isActive onActivate={vi.fn()} ducking />,
+    )
+    expect(mockPlayer.setVolume).toHaveBeenCalledWith(30) // 100 * 100 / 100 * 0.3 duck factor
+    mockPlayer.setVolume.mockClear()
+
+    rerender(
+      <Deck id="A" state={baseState({ volume: 100, gain: 100 })} onStateChange={vi.fn()} isActive onActivate={vi.fn()} />,
+    )
+    expect(mockPlayer.setVolume).toHaveBeenCalledWith(100)
+  })
+
   it('shows a clear error message and stops "playing" when the player reports an embedding restriction', async () => {
     await renderReadyDeck()
     act(() => capturedEvents.onError?.({ data: 101, target: mockPlayer }))
