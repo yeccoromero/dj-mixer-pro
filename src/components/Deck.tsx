@@ -285,23 +285,39 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
         </motion.div>
       </div>
 
-      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black/80">
-        <div id={containerId} className="h-full w-full" />
-        {/* Absorbs clicks/drags on the video itself so it stays a clean, passive display —
-            play/pause/seek only happen through our own controls below, never by interacting
-            with the embedded player directly (no native YouTube overlay, no accidental pause). */}
-        <div className="absolute inset-0" aria-hidden="true" />
-        {!ready && !error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-xs text-white/70">
-            Cargando reproductor…
-          </div>
-        )}
-        {error && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/80 px-3 text-center text-white">
-            <AlertTriangle className="h-5 w-5 text-lime-accent" />
-            <p className="text-xs">{error}</p>
-          </div>
-        )}
+      <div className="flex gap-3">
+        <div className="relative aspect-video flex-1 overflow-hidden rounded-xl bg-black/80">
+          <div id={containerId} className="h-full w-full" />
+          {/* Absorbs clicks/drags on the video itself so it stays a clean, passive display —
+              play/pause/seek only happen through our own controls below, never by interacting
+              with the embedded player directly (no native YouTube overlay, no accidental pause). */}
+          <div className="absolute inset-0" aria-hidden="true" />
+          {!ready && !error && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-xs text-white/70">
+              Cargando reproductor…
+            </div>
+          )}
+          {error && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/80 px-3 text-center text-white">
+              <AlertTriangle className="h-5 w-5 text-lime-accent" />
+              <p className="text-xs">{error}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Gain lives beside the video it controls, running the full height of the deck's
+            playback area — like the channel fader on a real mixer sits right next to the
+            deck, not off on its own below everything with empty space on both sides. */}
+        <div className="flex" onClick={(event) => event.stopPropagation()}>
+          <VerticalFader
+            label="Gain"
+            value={state.gain}
+            onChange={(v) => onStateChange((prev) => ({ ...prev, gain: v }))}
+            accent={color}
+            fill
+            description="Ganancia del deck: se combina con el crossfader para dar el volumen final"
+          />
+        </div>
       </div>
 
       <div className="min-h-[32px]">
@@ -361,17 +377,6 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
         >
           Marcar
         </button>
-      </div>
-
-      <div className="flex items-center justify-center pt-1" onClick={(event) => event.stopPropagation()}>
-        <VerticalFader
-          label="Gain"
-          value={state.gain}
-          onChange={(v) => onStateChange((prev) => ({ ...prev, gain: v }))}
-          accent={color}
-          height={96}
-          description="Ganancia del deck: se combina con el crossfader para dar el volumen final"
-        />
       </div>
     </motion.div>
   )

@@ -10,6 +10,10 @@ interface VerticalFaderProps {
   height?: number
   /** Longer explanation shown as a native tooltip on hover/focus. */
   description?: string
+  /** Stretch to fill the parent's height instead of using the fixed `height` prop — for
+   * placing the fader beside something of variable height (e.g. the deck's video), where a
+   * hardcoded pixel value would drift out of sync with the actual rendered size. */
+  fill?: boolean
 }
 
 export const VerticalFader: React.FC<VerticalFaderProps> = ({
@@ -19,6 +23,7 @@ export const VerticalFader: React.FC<VerticalFaderProps> = ({
   accent = 'lime',
   height = 128,
   description,
+  fill = false,
 }) => {
   const trackRef = useRef<HTMLDivElement>(null)
   const handleRef = useRef<HTMLDivElement>(null)
@@ -106,7 +111,7 @@ export const VerticalFader: React.FC<VerticalFaderProps> = ({
   const accentColor = accent === 'lime' ? 'hsl(var(--lime-accent))' : 'hsl(var(--aqua-accent))'
 
   return (
-    <div className="flex flex-col items-center gap-1.5 select-none">
+    <div className={cn('flex flex-col items-center gap-1.5 select-none', fill && 'h-full')}>
       <div
         ref={trackRef}
         role="slider"
@@ -122,8 +127,8 @@ export const VerticalFader: React.FC<VerticalFaderProps> = ({
           if (event.key === 'ArrowDown' || event.key === 'ArrowLeft') onChange(Math.max(0, value - 1))
         }}
         onPointerDown={handleTrackPointerDown}
-        className="knob relative w-3 cursor-pointer touch-none"
-        style={{ height }}
+        className={cn('knob relative w-3 cursor-pointer touch-none', fill && 'flex-1')}
+        style={fill ? undefined : { height }}
       >
         <div
           className="pointer-events-none absolute bottom-0 left-0 w-full rounded-full"

@@ -108,6 +108,16 @@ consolas físicas, más legible de un vistazo que un ángulo de rotación. Nuevo
 `VerticalFader.tsx`, con la misma base de `Draggable` + `InertiaPlugin` que ya usaban Gain/Filter/
 CrossFader, adaptada a arrastre vertical (`type: "y"`) en vez de rotación.
 
+**Ubicación del fader — al lado del video, no debajo de todo:** la primera versión ponía el fader
+centrado en su propia fila, debajo de CUE/MARCAR, solo en medio de una franja vacía a ambos lados
+— no se leía como parte de un mixer, se veía como un control suelto flotando en el aire. Se movió
+al costado del video (a la derecha), ocupando toda su altura — igual que el fader de canal de un
+mixer real, que va pegado a la pista que controla, no en un panel aparte. El video pasa de `w-full`
+a `flex-1` dentro de una fila (`flex`) junto al fader; `VerticalFader` gana una prop `fill` que, en
+vez de una altura fija en píxeles, estira el control al 100% de lo que el layout flexbox le da —
+así la altura del fader sigue automáticamente la del video en cualquier ancho de pantalla, sin
+necesidad de calcularla a mano.
+
 **Cue, rehecho para que se sienta natural:** la versión anterior obligaba a calcular a ciegas un
 % de la pista con un knob, sin escuchar nada mientras tanto — nunca se sentía como "marcar el
 momento que estoy escuchando". Ahora el flujo es: arrastrar la barra de posición (o simplemente
