@@ -285,7 +285,12 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
         </motion.div>
       </div>
 
-      <div className="flex gap-3">
+      {/* Gain lives beside the video it controls, running the full height of the deck's
+          playback area — like the channel fader on a real mixer sits right next to the deck,
+          not off on its own below everything with empty space on both sides. On Deck B the
+          row is mirrored (fader first, video second) so the fader sits on the side closest to
+          the crossfader in the middle, matching Deck A's fader on its own inner side. */}
+      <div className={cn('flex gap-3', id === 'B' && 'flex-row-reverse')}>
         <div className="relative aspect-video flex-1 overflow-hidden rounded-xl bg-black/80">
           <div id={containerId} className="h-full w-full" />
           {/* Absorbs clicks/drags on the video itself so it stays a clean, passive display —
@@ -305,9 +310,6 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
           )}
         </div>
 
-        {/* Gain lives beside the video it controls, running the full height of the deck's
-            playback area — like the channel fader on a real mixer sits right next to the
-            deck, not off on its own below everything with empty space on both sides. */}
         <div className="flex" onClick={(event) => event.stopPropagation()}>
           <VerticalFader
             label="Gain"

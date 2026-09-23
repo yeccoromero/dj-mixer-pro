@@ -118,6 +118,12 @@ vez de una altura fija en píxeles, estira el control al 100% de lo que el layou
 así la altura del fader sigue automáticamente la del video en cualquier ancho de pantalla, sin
 necesidad de calcularla a mano.
 
+**Deck B, en espejo:** con los dos faders a la derecha de su video, el de Deck A queda hacia el
+centro de la pantalla (cerca del crossfader) pero el de Deck B queda en el borde exterior, lejos
+de todo. Se invirtió el orden en Deck B (`flex-row-reverse`: fader primero, video después) para
+que su fader también quede del lado que mira al centro — los dos decks simétricos, cada fader
+cerca del crossfader que combina ambos, no uno cerca y el otro lejos.
+
 **Cue, rehecho para que se sienta natural:** la versión anterior obligaba a calcular a ciegas un
 % de la pista con un knob, sin escuchar nada mientras tanto — nunca se sentía como "marcar el
 momento que estoy escuchando". Ahora el flujo es: arrastrar la barra de posición (o simplemente
