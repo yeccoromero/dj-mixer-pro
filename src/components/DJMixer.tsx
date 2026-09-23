@@ -22,7 +22,6 @@ export interface DeckState {
   currentTime: number
   volume: number
   gain: number
-  filter: number
   cue: number
   track: Track | null
 }
@@ -66,7 +65,6 @@ const createInitialDeckState = (track: Track | null): DeckState => ({
   // this knob. Starting at 100 matches YouTube's own volume once the crossfader favors
   // this deck; the knob can still be pulled down from there like any real gain trim.
   gain: 100,
-  filter: 50,
   cue: 0,
   track,
 })

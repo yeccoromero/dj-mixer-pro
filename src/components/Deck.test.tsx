@@ -75,7 +75,6 @@ function baseState(overrides: Partial<DeckState> = {}): DeckState {
     currentTime: 0,
     volume: 100,
     gain: 100,
-    filter: 50,
     cue: 25,
     track,
     ...overrides,

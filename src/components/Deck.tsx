@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Play, Pause, Disc3, AlertTriangle } from 'lucide-react'
 import type { DeckState } from './DJMixer'
-import { Knob } from './Knob'
+import { VerticalFader } from './VerticalFader'
 import { WavePanel } from './WavePanel'
 import { loadYouTubeApi, describeYouTubeError, type YouTubePlayer } from '@/lib/youtube'
 import { computeCuePercent, computeEffectiveVolume } from '@/lib/mixerMath'
@@ -286,7 +286,7 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
       </div>
 
       <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black/80">
-        <div id={containerId} className="h-full w-full" style={{ filter: `saturate(${0.5 + state.filter / 100})` }} />
+        <div id={containerId} className="h-full w-full" />
         {/* Absorbs clicks/drags on the video itself so it stays a clean, passive display —
             play/pause/seek only happen through our own controls below, never by interacting
             with the embedded player directly (no native YouTube overlay, no accidental pause). */}
@@ -363,20 +363,14 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
         </button>
       </div>
 
-      <div className="flex items-center justify-around pt-1" onClick={(event) => event.stopPropagation()}>
-        <Knob
+      <div className="flex items-center justify-center pt-1" onClick={(event) => event.stopPropagation()}>
+        <VerticalFader
           label="Gain"
           value={state.gain}
           onChange={(v) => onStateChange((prev) => ({ ...prev, gain: v }))}
           accent={color}
+          height={96}
           description="Ganancia del deck: se combina con el crossfader para dar el volumen final"
-        />
-        <Knob
-          label="Filter"
-          value={state.filter}
-          onChange={(v) => onStateChange((prev) => ({ ...prev, filter: v }))}
-          accent={color}
-          description="Filtro visual (saturación del video); no afecta el audio del embed de YouTube"
         />
       </div>
     </motion.div>

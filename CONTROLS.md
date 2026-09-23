@@ -85,13 +85,28 @@ solo pasan por los botones de este panel, que son los que llaman a `player.playV
 | **Barra de posición** *(`WavePanel.tsx`, estilo idéntico al buscador de YouTube — sin líneas verticales)* | Tocar salta a ese punto; **arrastrar** (mouse o dedo) llena la barra en vivo mientras se sostiene; el salto real al video se confirma una sola vez, al soltar | `player.seekTo(...)` + `DeckState.currentTime`, solo en el `pointerup` | Delgada en reposo, un poco más gruesa al pasar el mouse o mientras se arrastra (igual que YouTube). El relleno de lo reproducido crece de izquierda a derecha en tiempo real, en el color del deck (lima/aqua) — no es una línea marcando un punto, es una barra llenándose. Detrás, un relleno gris muestra cuánto video está realmente precargado (`player.getVideoLoadedFraction()`, dato real de YouTube). La manija circular está invisible en reposo y aparece (crece) solo al pasar el mouse o arrastrar, igual que YouTube. El punto de cue guardado es un puntito blanco chico sobre la barra, no una línea |
 | **Botón CUE** *(más chico, debajo del Play — control secundario)* | **Toque corto**: salta al punto de cue guardado sin cortar la reproducción — si estaba sonando, sigue sonando desde ahí (útil para hacer loops manuales, tocando CUE repetidas veces al ritmo). Si estaba pausado, queda pausado en el nuevo punto. **Mantener presionado**: reproduce de prueba desde el cue mientras se sostiene (arranca a sonar aunque estuviera pausado); al soltar, vuelve al cue y pausa — a diferencia del toque corto, soltar sí pausa siempre, porque la idea de la vista previa es volver exactamente a donde se empezó | Lee `DeckState.cue` (0–100%) y `track.duration` para calcular el segundo exacto; `player.seekTo(...)`, y solo `pauseVideo()`/`playVideo()` en el gesto de mantener presionado | Deshabilitado hasta `onReady` y si no hay pista asignada. El "soltar" se detecta con un listener global de `pointerup`, así funciona aunque el puntero se mueva fuera del botón antes de soltar |
 | **Botón MARCAR** | Guarda la posición actual de reproducción como el nuevo punto de cue — se escucha el momento exacto (o se busca arrastrando la barra) y se marca ahí, en vez de calcular a ciegas un % | `DeckState.cue` (`lib/mixerMath.ts#computeCuePercent`) | Da un flash visual breve de confirmación al tocarlo |
-| **Knob GAIN** *(tooltip: "Ganancia del deck: se combina con el crossfader")* | Se arrastra el disco completo (gira de verdad, con inercia — un giro rápido sigue girando hasta frenar) o se usan las flechas ↑/↓ del teclado | `DeckState.gain` | Se combina con el volumen del crossfader (`computeEffectiveVolume`) y se envía como `player.setVolume(...)`. Arranca al máximo (100), no a la mitad — ver nota de volumen abajo |
-| **Knob FILTER** *(tooltip aclara que es solo visual)* | Igual interacción que Gain | `DeckState.filter` | Aplica un filtro CSS `saturate()` en vivo sobre el video — efecto visual, no de audio (el audio del embed de YouTube no es interceptable) |
+| **Fader vertical GAIN** *(tooltip: "Ganancia del deck: se combina con el crossfader para dar el volumen final")* | Se arrastra la manija hacia arriba/abajo (con inercia — un flick rápido sigue deslizando hasta frenar), se toca cualquier punto de la barra para saltar directo ahí, o se usan las flechas ↑/↓ del teclado | `DeckState.gain` | Se combina con el volumen del crossfader (`computeEffectiveVolume`) y se envía como `player.setVolume(...)`. Arranca al máximo (100), no a la mitad — ver nota de volumen abajo. Arriba = volumen máximo, abajo = silencio, como el fader de canal de un mixer real |
 
-**Físicas reales del knob (GSAP):** cada knob es un `Draggable` de GSAP (`type: "rotation"`) con
-`InertiaPlugin` — arrastrarlo gira el disco entero (no solo una agujita suelta), y si se suelta con
-velocidad, sigue girando por su cuenta y frena naturalmente en vez de detenerse en seco donde
-soltaste el mouse. Las flechas del teclado siguen funcionando igual que antes (accesibilidad).
+**Físicas reales del fader de Gain (GSAP):** es un `Draggable` de GSAP (`type: "y"`, acotado a la
+barra) con `InertiaPlugin` — arrastrar la manija la desliza de verdad, y si se suelta con
+velocidad, sigue deslizando por su cuenta y frena naturalmente en vez de detenerse en seco donde
+soltaste el mouse. Tocar la barra (fuera de la manija) salta directo a ese punto. Las flechas del
+teclado siguen funcionando igual que antes (accesibilidad).
+
+**Se quitó el Filter:** el knob Filter aplicaba un filtro CSS `saturate()` en vivo sobre el video
+— un efecto puramente visual, nunca de audio (el audio del embed de YouTube no es interceptable
+vía Web Audio API, así que un "filtro" de audio real nunca fue posible en esta app). Pedido
+explícito: si no se puede ofrecer un filtro de audio de verdad, no tiene sentido mantener uno que
+solo cambia el color del video y puede confundirse con un control de sonido. Se eliminó el control,
+su estado (`DeckState.filter`) y el componente `Knob.tsx` que ya no tenía otro uso.
+
+**Rediseño de Gain — de knob rotativo a fader vertical:** a pedido explícito ("quita todo lo
+innecesario como Filter"; el Gain "debería ser como la imagen de referencia"), se reemplazó el
+knob giratorio por un fader vertical de dos posiciones (arriba = máximo, abajo = silencio),
+inspirado en los faders de canal de un mixer de DJ real — el mismo lenguaje visual que ya usan las
+consolas físicas, más legible de un vistazo que un ángulo de rotación. Nuevo componente
+`VerticalFader.tsx`, con la misma base de `Draggable` + `InertiaPlugin` que ya usaban Gain/Filter/
+CrossFader, adaptada a arrastre vertical (`type: "y"`) en vez de rotación.
 
 **Cue, rehecho para que se sienta natural:** la versión anterior obligaba a calcular a ciegas un
 % de la pista con un knob, sin escuchar nada mientras tanto — nunca se sentía como "marcar el
@@ -308,7 +323,7 @@ altas, bajas y correcciones de duración incluidas.
 |---|---|---|
 | Play / Pause | ✅ (`Deck.test.tsx`, reproductor mockeado) | ✅ (queda deshabilitado correctamente; YouTube real no es alcanzable desde este sandbox de red) |
 | Cue | ✅ cálculo del segundo exacto | ✅ |
-| Knobs (Gain/Filter/Cue pt.) | ✅ teclado + clamps | ✅ (drag real con mouse + inercia/flick confirmados con Playwright) |
+| Fader de Gain | ✅ teclado + clamps + clic-para-saltar | ✅ (drag real con mouse + inercia/flick confirmados con Playwright) |
 | Crossfader (clic-para-saltar + drag + Centrar) | ✅ (lo controlado por React) | ✅ (clic, drag, flick con inercia y Centrar, todos confirmados con Playwright) |
 | Activar deck (A/B) | — | ✅ |
 | CoverFlow (‹ › + swipe, sin bloquearse tras seleccionar) | ✅ | ✅ |
