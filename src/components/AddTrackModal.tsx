@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Loader2, Plus, Search } from 'lucide-react'
+import React, { useEffect, useRef, useState } from 'react'
+import { Loader2, Plus, Search, X } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -42,6 +42,13 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack, existi
   const [searching, setSearching] = useState(false)
   const [searched, setSearched] = useState(false)
   const [addingId, setAddingId] = useState<string | null>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  // Switching into the Buscar tab should let you start typing immediately, not require an
+  // extra click into the field first.
+  useEffect(() => {
+    if (mode === 'search') searchInputRef.current?.focus()
+  }, [mode])
 
   const reset = () => {
     setMode('link')
@@ -131,6 +138,14 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack, existi
     setSearched(true)
   }
 
+  const handleClearSearch = () => {
+    setSearchQuery('')
+    setSearchResults([])
+    setSearched(false)
+    setError(null)
+    searchInputRef.current?.focus()
+  }
+
   const handleAddFromSearch = async (video: SuggestedVideo) => {
     setAddingId(video.youtubeId)
     setError(null)
@@ -212,13 +227,26 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack, existi
         {mode === 'search' ? (
           <div className="flex flex-col gap-3">
             <form onSubmit={handleSearchSubmit} className="flex gap-2">
-              <input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Título, artista, remix..."
-                aria-label="Buscar en YouTube"
-                className="h-10 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-              />
+              <div className="relative flex-1">
+                <input
+                  ref={searchInputRef}
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Título, artista, remix..."
+                  aria-label="Buscar en YouTube"
+                  className="h-10 w-full rounded-md border border-border bg-background px-3 pr-9 text-sm outline-none focus:ring-2 focus:ring-ring"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    aria-label="Limpiar búsqueda"
+                    className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
               <Button type="submit" variant="outline" className="gap-2" disabled={searching || !searchQuery.trim()}>
                 {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                 Buscar
@@ -233,32 +261,40 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack, existi
               </p>
             )}
 
-            <div className="flex max-h-80 flex-col gap-2 overflow-y-auto">
+            {searched && !searching && visibleSearchResults.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {visibleSearchResults.length} resultado{visibleSearchResults.length === 1 ? '' : 's'}
+              </p>
+            )}
+
+            <div className="grid max-h-96 grid-cols-2 gap-3 overflow-y-auto pr-1">
               {visibleSearchResults.map((video) => (
-                <div key={video.youtubeId} className="flex items-center gap-3 rounded-md border border-border p-2">
-                  <img
-                    src={video.thumbnail}
-                    alt={video.title}
-                    className="h-12 w-20 shrink-0 rounded object-cover"
-                    draggable={false}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{video.title}</p>
-                    <p className="truncate text-xs text-muted-foreground">{video.channelTitle}</p>
+                <div key={video.youtubeId} className="overflow-hidden rounded-lg border border-border bg-muted/30">
+                  <div className="relative aspect-video w-full overflow-hidden bg-black/10">
+                    <img
+                      src={video.thumbnail}
+                      alt={video.title}
+                      className="h-full w-full object-cover"
+                      draggable={false}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleAddFromSearch(video)}
+                      disabled={addingId === video.youtubeId}
+                      title={`Agregar "${video.title}" a la biblioteca`}
+                      className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-lime-accent text-black shadow disabled:opacity-60"
+                    >
+                      {addingId === video.youtubeId ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Plus className="h-4 w-4" />
+                      )}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleAddFromSearch(video)}
-                    disabled={addingId === video.youtubeId}
-                    title={`Agregar "${video.title}" a la biblioteca`}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-lime-accent text-black shadow disabled:opacity-60"
-                  >
-                    {addingId === video.youtubeId ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Plus className="h-4 w-4" />
-                    )}
-                  </button>
+                  <div className="p-2">
+                    <p className="line-clamp-2 text-xs font-medium leading-snug">{video.title}</p>
+                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{video.channelTitle}</p>
+                  </div>
                 </div>
               ))}
             </div>

@@ -251,6 +251,58 @@ describe('AddTrackModal', () => {
       await waitFor(() => expect(screen.getByText(/Sin resultados/)).toBeInTheDocument())
     })
 
+    it('focuses the search field when switching into the Buscar tab', () => {
+      render(<AddTrackModal onAddTrack={vi.fn()} />)
+
+      fireEvent.click(screen.getByText('Agregar pista'))
+      fireEvent.click(screen.getByText('Buscar'))
+
+      expect(screen.getByLabelText('Buscar en YouTube')).toHaveFocus()
+    })
+
+    it('the clear button resets the query and results, and refocuses the field', async () => {
+      vi.mocked(searchSuggestedVideos).mockResolvedValue([searchResult])
+      render(<AddTrackModal onAddTrack={vi.fn()} />)
+
+      fireEvent.click(screen.getByText('Agregar pista'))
+      fireEvent.click(screen.getByText('Buscar'))
+      const field = screen.getByLabelText('Buscar en YouTube')
+      fireEvent.change(field, { target: { value: 'deep house mix' } })
+      fireEvent.submit(field.closest('form')!)
+      await screen.findByText('A Search Result')
+
+      fireEvent.click(screen.getByLabelText('Limpiar búsqueda'))
+
+      expect(field).toHaveValue('')
+      expect(field).toHaveFocus()
+      expect(screen.queryByText('A Search Result')).not.toBeInTheDocument()
+    })
+
+    it('the clear button only shows once there is something typed', () => {
+      render(<AddTrackModal onAddTrack={vi.fn()} />)
+
+      fireEvent.click(screen.getByText('Agregar pista'))
+      fireEvent.click(screen.getByText('Buscar'))
+
+      expect(screen.queryByLabelText('Limpiar búsqueda')).not.toBeInTheDocument()
+
+      fireEvent.change(screen.getByLabelText('Buscar en YouTube'), { target: { value: 'a' } })
+      expect(screen.getByLabelText('Limpiar búsqueda')).toBeInTheDocument()
+    })
+
+    it('shows a result count once the search resolves', async () => {
+      vi.mocked(searchSuggestedVideos).mockResolvedValue([searchResult])
+      render(<AddTrackModal onAddTrack={vi.fn()} />)
+
+      fireEvent.click(screen.getByText('Agregar pista'))
+      fireEvent.click(screen.getByText('Buscar'))
+      const field = screen.getByLabelText('Buscar en YouTube')
+      fireEvent.change(field, { target: { value: 'deep house mix' } })
+      fireEvent.submit(field.closest('form')!)
+
+      expect(await screen.findByText('1 resultado')).toBeInTheDocument()
+    })
+
     it('switching back to the Link tab keeps the link form working as before', async () => {
       const onAddTrack = vi.fn()
       render(<AddTrackModal onAddTrack={onAddTrack} />)

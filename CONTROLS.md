@@ -418,17 +418,29 @@ alterna qué formulario se muestra, sin perder el estado del otro.
 
 | Control (pestaña Buscar) | Qué hace |
 |---|---|
-| **Campo de búsqueda + botón "Buscar"** | Busca por texto libre (título, artista, lo que sea) vía `searchSuggestedVideos` (la misma función de `lib/youtubeSuggestions.ts` que usa Sugeridos) y muestra los resultados como una lista con miniatura |
-| **Botón "+" sobre un resultado** | Verifica reproducibilidad (mismo chequeo que el formulario de link) y, si pasa, agrega la pista directamente — sin cerrar el modal, para poder seguir buscando y agregar varias de una sola búsqueda |
+| **Campo de búsqueda + botón "Buscar"** | Busca por texto libre (título, artista, lo que sea) vía `searchSuggestedVideos` (la misma función de `lib/youtubeSuggestions.ts` que usa Sugeridos) y muestra los resultados en una grilla de 2 columnas con miniatura grande |
+| **Botón "×" dentro del campo** (solo visible con texto escrito) | Limpia la búsqueda (texto, resultados, error) y devuelve el foco al campo, para probar otra palabra sin tocar el mouse |
+| **Botón "+" sobre la miniatura de un resultado** | Verifica reproducibilidad (mismo chequeo que el formulario de link) y, si pasa, agrega la pista directamente — sin cerrar el modal, para poder seguir buscando y agregar varias de una sola búsqueda |
 
 **Búsqueda explícita, no autocompletar tecla por tecla:** a diferencia de Sugeridos (que busca
 sola con debounce cuando cambia la pista activa), acá la búsqueda solo se dispara al enviar el
 formulario (botón "Buscar" o Enter) — cada búsqueda cuesta 100 de las ~10.000 unidades diarias de
 cuota, así que autobuscar en cada tecla tipeada agotaría la cuota en una sola palabra escrita.
 
+**Autofocus al cambiar de pestaña:** pedido explícito ("mejora el modal de búsqueda" → autofocus +
+limpiar). Un `useEffect` sobre el estado `mode` enfoca el campo de búsqueda apenas se activa la
+pestaña Buscar, así se puede empezar a tipear de inmediato sin un clic extra en el campo.
+
+**Rediseño visual — grilla en vez de lista, miniaturas más grandes:** mismo pedido. Los resultados
+pasaron de una lista vertical con miniaturas chicas (80×48px) a una grilla de 2 columnas con
+miniatura a lo ancho de la tarjeta (`aspect-video`), título en hasta 2 líneas (`line-clamp-2`) y
+el botón "+" superpuesto sobre la esquina de la miniatura — mismo patrón visual que usa el carrusel
+de Biblioteca para su botón de cargar/quitar. También se agregó un contador ("N resultados") arriba
+de la grilla para confirmar de un vistazo cuántos trajo la búsqueda.
+
 **Resultados ya agregados desaparecen de la lista:** igual que Sugeridos, los resultados se
 filtran contra `existingTrackIds` (los IDs de YouTube ya en la biblioteca, pasados desde
-`CoverFlow.tsx`) — apenas se agrega uno, desaparece de la lista de resultados visibles, como
+`CoverFlow.tsx`) — apenas se agrega uno, desaparece de la grilla de resultados visibles, como
 confirmación visual de que ya está en la biblioteca, sin tener que volver a buscar.
 
 **Los links de YouTube Shorts se rechazan (`lib/youtubeId.ts#isYouTubeShortsUrl`):** YouTube sirve
