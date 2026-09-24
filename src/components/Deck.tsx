@@ -144,11 +144,15 @@ export const Deck = forwardRef<DeckHandle, DeckProps>(function Deck(
   }, [id])
 
   // Load a new video when the assigned track changes, or stop playback if it was cleared.
+  // `cueVideoById`, not `loadVideoById` — the latter starts playing immediately on its own,
+  // which meant both decks blasted audio at once the moment their players became ready (on
+  // every page load, since both decks start with a track assigned). Cueing loads the video
+  // paused at its start; playback only ever begins from an explicit Play/Cue/Auto DJ action.
   useEffect(() => {
     if (!ready || !playerRef.current) return
     if (state.track) {
       setError(null)
-      playerRef.current.loadVideoById(state.track.youtubeId)
+      playerRef.current.cueVideoById(state.track.youtubeId)
     } else {
       setError(null)
       playerRef.current.pauseVideo()

@@ -89,7 +89,7 @@ describe('DJMixer — Auto DJ', () => {
     act(() => vi.advanceTimersByTime(500))
 
     expect(cueAndPlaySpies.B).not.toHaveBeenCalled()
-    expect(capturedCrossFaderProps?.value).toBe(50)
+    expect(capturedCrossFaderProps?.value).toBe(0) // starts fully on Deck A, not centered
   })
 
   it('starts the other deck and begins crossfading once the playing deck has 5s or less left', () => {
@@ -125,7 +125,7 @@ describe('DJMixer — Auto DJ', () => {
   it('the crossfade reaches full B and stops on its own once the transition window elapses', () => {
     render(<DJMixer />)
     enableAutoDj()
-    setDeckState('A', { isPlaying: true, currentTime: 196 }) // 4s left, starts at value=50
+    setDeckState('A', { isPlaying: true, currentTime: 196 }) // 4s left, starts at value=0
 
     act(() => vi.advanceTimersByTime(2000)) // AUTO_DJ_TRANSITION_SECONDS
 
@@ -140,7 +140,7 @@ describe('DJMixer — Auto DJ', () => {
 
     act(() => vi.advanceTimersByTime(1000)) // partway through the 2s transition
     const valueMidway = capturedCrossFaderProps?.value
-    expect(valueMidway).toBeGreaterThan(50)
+    expect(valueMidway).toBeGreaterThan(0)
     expect(valueMidway).toBeLessThan(100)
 
     fireEvent.click(screen.getByText('drag-start'))

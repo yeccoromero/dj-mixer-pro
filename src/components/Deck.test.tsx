@@ -33,7 +33,7 @@ const mockPlayer = {
   getCurrentTime: vi.fn(() => 0),
   getDuration: vi.fn(() => 0),
   getVideoLoadedFraction: vi.fn(() => 0),
-  loadVideoById: vi.fn(),
+  cueVideoById: vi.fn(),
   destroy: vi.fn(),
 }
 
@@ -114,6 +114,17 @@ describe('Deck', () => {
 
     expect(screen.getByText('Cue')).toBeEnabled()
     expect(screen.queryByText('Cargando reproductor…')).not.toBeInTheDocument()
+  })
+
+  it('never auto-plays just because a track was already assigned when the player becomes ready — this is what caused both decks to blast audio on every page load', async () => {
+    render(<Deck id="A" state={baseState()} onStateChange={vi.fn()} isActive onActivate={vi.fn()} />)
+    await act(async () => {
+      await Promise.resolve()
+    })
+    act(() => capturedEvents.onReady?.({ target: mockPlayer }))
+
+    expect(mockPlayer.cueVideoById).toHaveBeenCalledWith(track.youtubeId)
+    expect(mockPlayer.playVideo).not.toHaveBeenCalled()
   })
 
   it('Play button calls playVideo() when paused', async () => {
@@ -335,7 +346,7 @@ describe('Deck', () => {
     expect(screen.getByText('El dueño del video bloqueó su reproducción fuera de YouTube')).toBeInTheDocument()
   })
 
-  it('loads a new video via loadVideoById when the assigned track changes', async () => {
+  it('cues (but does not play) a new video when the assigned track changes', async () => {
     const { rerender } = render(
       <Deck id="A" state={baseState()} onStateChange={vi.fn()} isActive onActivate={vi.fn()} />,
     )
@@ -343,11 +354,13 @@ describe('Deck', () => {
       await Promise.resolve()
     })
     act(() => capturedEvents.onReady?.({ target: mockPlayer }))
+    mockPlayer.playVideo.mockClear()
 
     const newTrack: Track = { ...track, id: 't2', youtubeId: 'abcdefghijk' }
     rerender(<Deck id="A" state={baseState({ track: newTrack })} onStateChange={vi.fn()} isActive onActivate={vi.fn()} />)
 
-    expect(mockPlayer.loadVideoById).toHaveBeenCalledWith('abcdefghijk')
+    expect(mockPlayer.cueVideoById).toHaveBeenCalledWith('abcdefghijk')
+    expect(mockPlayer.playVideo).not.toHaveBeenCalled()
   })
 
   it('Gain knob updates deck state via keyboard interaction', async () => {

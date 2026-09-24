@@ -100,7 +100,10 @@ export const DJMixer: React.FC = () => {
 
   const [deckA, setDeckA] = useState<DeckState>(() => createInitialDeckState(tracks[0] ?? null))
   const [deckB, setDeckB] = useState<DeckState>(() => createInitialDeckState(tracks[1] ?? tracks[0] ?? null))
-  const [crossFaderValue, setCrossFaderValue] = useState<number>(50)
+  // Starts fully on Deck A, not centered — a fresh session (or a reload) should already read
+  // as "one deck is the live one" rather than both decks audible at once, which is also what
+  // Auto DJ needs: a clear side to hand off *from* once the user presses Play there.
+  const [crossFaderValue, setCrossFaderValue] = useState<number>(0)
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null)
   const [activeDeck, setActiveDeck] = useState<'A' | 'B'>('A')
   // While an FX pad is held, both decks duck their track volume so the effect (a separate

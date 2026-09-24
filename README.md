@@ -8,7 +8,8 @@ Un DJ mixer profesional en el navegador construido con React, TypeScript, Tailwi
 - **Crossfader con físicas reales** (GSAP Draggable + inercia) y curva de potencia constante (equal-power), como en un mixer real: clic para saltar, arrastre, y "flick" que desliza y frena solo
 - **Auto DJ**: cuando la pista que suena está por terminar (5s o menos), cruza sola al otro deck si tiene una pista cargada — arranca esa pista desde su cue si no estaba sonando, anima el crossfader hasta el otro extremo en 2 segundos, y se puede interrumpir en cualquier momento agarrando el fader a mano o apagando el interruptor
 - **Fader vertical de Gain** que se desliza de verdad con inercia (GSAP), clic-para-saltar, o por teclado, con tooltip explicando su función
-- **Reproductor limpio**: sin controles ni interfaz propia de YouTube encima del video, sin captions por defecto; play/pause/cue solo desde la consola de la app
+- **Reproductor limpio**: sin controles ni interfaz propia de YouTube encima del video, sin captions por defecto; play/pause/cue solo desde la consola de la app, y cargar una pista nunca la reproduce sola — arranca siempre pausada en su punto de inicio hasta una acción explícita
+- **El crossfader arranca a full Deck A**, no al centro — al abrir la app queda un solo lado claramente "vivo" en vez de los dos decks mezclados
 - **Cue al estilo CDJ**: barra de posición tocable/arrastrable (como el buscador de YouTube) para buscar el momento, botón MARCAR para guardarlo ahí mismo (con un botón de reset para volver a 0), y CUE con toque corto (salta sin cortar la reproducción, útil para loops manuales) o mantener presionado (vista previa, vuelve y pausa al soltar)
 - **Loop de 3 toques**: marca entrada, marca salida y activa, y desactiva — la pista se repite sola entre los dos puntos sin BPM ni cuantización
 - **Contador LED de tiempo transcurrido/restante** por deck, en tipografía de matriz de puntos (`DotGothic16`)

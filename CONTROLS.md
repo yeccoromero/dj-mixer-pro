@@ -178,6 +178,27 @@ directamente lo pause/reproduzca por su cuenta, saltándose el estado de la app 
 solo pasan por los botones de este panel, que son los que llaman a `player.playVideo()` /
 `pauseVideo()` / `seekTo()` explícitamente.
 
+**Bug corregido — las dos pistas arrancaban solas al cargar la página:** reporte real del
+usuario ("al recargar se reproducen las dos pistas"). La causa: el efecto que carga la pista
+asignada a un deck usaba `player.loadVideoById(id)` — y esa función de la API de YouTube **no
+solo carga el video, también lo reproduce de inmediato**, a diferencia de lo que el nombre
+sugiere. Como los dos decks arrancan con una pista asignada (los 3 temas de muestra, o lo que
+haya quedado guardado en `localStorage`), apenas cada reproductor terminaba de inicializarse
+(`onReady`) disparaba esa carga-y-reproducción por su cuenta, sin que el usuario tocara nada — las
+dos pistas sonando a la vez, encima del crossfader arrancando al centro (ver abajo), hacía que se
+escucharan mezcladas. Se cambió a `player.cueVideoById(id)`, que carga el video pausado en su
+punto de inicio sin reproducirlo — la reproducción ahora **siempre** arranca por una acción
+explícita (Play, CUE, o Auto DJ), nunca solo por tener una pista cargada. Mismo cambio aplica
+tanto al primer montaje del deck como a cargar una pista distinta después (`CoverFlow`'s "Cargar en
+Deck") — cargar nunca debería reproducir de una, como en cualquier software de DJ real.
+
+**Ajuste — el crossfader arranca a la izquierda, no al centro:** mismo reporte ("el crossfader ya
+debe empezar en un lado... para que el automático funcione mejor"). Antes `DJMixer.crossFaderValue`
+arrancaba en 50 (mitad, ambos decks audibles si los dos llegaran a sonar) — ahora arranca en 0
+(Deck A a full, Deck B en silencio). Además de leerse mejor al abrir la app (un lado claramente
+"vivo", no los dos mezclados), le da a Auto DJ un lado de dónde partir apenas el usuario le da Play
+al Deck A, en vez de depender de que alguien mueva el fader a mano primero.
+
 | Control | Qué hace | Estado que toca | Notas |
 |---|---|---|---|
 | **Cuerpo del deck** (clic en cualquier parte no interactiva) | Marca este deck como el "activo" | `DJMixer.activeDeck` | Determina a qué deck carga la próxima pista con el botón "Cargar en Deck" de `CoverFlow` |

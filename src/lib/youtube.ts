@@ -8,7 +8,10 @@ export interface YouTubePlayer {
   /** 0-1 fraction of the video actually buffered so far — the real signal behind the
    * "preload" fill on the position bar, the same thing YouTube's own player shows. */
   getVideoLoadedFraction(): number
-  loadVideoById(videoId: string): void
+  /** Loads a video and cues it, paused, at its start — unlike `loadVideoById`, this does NOT
+   * start playback on its own. A deck should never blast audio just because a track got
+   * assigned to it; playback only starts from an explicit Play/Cue/Auto DJ action. */
+  cueVideoById(videoId: string): void
   destroy(): void
 }
 
