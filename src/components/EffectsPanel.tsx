@@ -125,7 +125,7 @@ export const EffectsPanel: React.FC<EffectsPanelProps> = ({ onEffectTrigger, onD
       <span className={embedded ? 'text-xs text-muted-foreground' : 'music-body'}>
         Efectos <span className="opacity-60">(teclas 1-4)</span>
       </span>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-4 gap-3">
         {EFFECTS.map(({ id, label, icon: Icon, bg, base, fg }) => {
           const isHeld = activeEffect === id
           return (
@@ -147,11 +147,11 @@ export const EffectsPanel: React.FC<EffectsPanelProps> = ({ onEffectTrigger, onD
                 // height — while held, the button sinks into that wall instead of floating above it.
                 boxShadow: isHeld ? `0 1px 0 ${base}` : `0 4px 0 ${base}`,
               }}
-              className="relative flex flex-col items-center gap-1 rounded-lg py-2.5 transition-[box-shadow] duration-100"
+              className="relative flex flex-col items-center gap-1.5 rounded-lg px-2 py-3 transition-[box-shadow] duration-100"
             >
-              <span className="absolute right-1.5 top-1 text-[8px] font-bold opacity-70">{EFFECT_TO_KEY[id]}</span>
-              <Icon className="h-4 w-4" />
-              <span className="text-[10px] font-bold uppercase tracking-wide">{label}</span>
+              <span className="absolute right-2 top-1.5 text-[9px] font-bold opacity-70">{EFFECT_TO_KEY[id]}</span>
+              <Icon className="h-5 w-5" />
+              <span className="text-[11px] font-bold uppercase tracking-wide">{label}</span>
             </motion.button>
           )
         })}

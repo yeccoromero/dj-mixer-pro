@@ -184,7 +184,7 @@ export const DJMixer: React.FC = () => {
               Reproducción vía YouTube • Contenido sin modificar • Uso bajo Política de YouTube
             </p>
           </div>
-          <div className="mx-auto w-full max-w-xs lg:mx-0 lg:w-auto">
+          <div className="mx-auto w-full max-w-sm lg:mx-0 lg:w-auto">
             <EffectsPanel embedded onEffectTrigger={handleEffectTrigger} onDuckingChange={setDucking} />
           </div>
         </motion.div>
