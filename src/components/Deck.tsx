@@ -4,6 +4,7 @@ import { Play, Pause, Disc3, AlertTriangle, RotateCcw, Repeat } from 'lucide-rea
 import type { DeckState } from './DJMixer'
 import { VerticalFader } from './VerticalFader'
 import { WavePanel } from './WavePanel'
+import { ScratchWheel } from './ScratchWheel'
 import { loadYouTubeApi, describeYouTubeError, type YouTubePlayer } from '@/lib/youtube'
 import { computeCuePercent, computeEffectiveVolume } from '@/lib/mixerMath'
 import { formatTime } from '@/lib/format'
@@ -41,6 +42,15 @@ const DUCK_FACTOR = 0.3
 // (or, at 0, infinitely-retriggering) loop — ignored instead, so the button just keeps
 // waiting for a real out point.
 const MIN_LOOP_PERCENT = 1
+// How much track time one full 360° turn of the scratch wheel covers — tuned by feel, not by
+// any real turntable spec (there's no physical platter circumference to match here). Small
+// enough that a normal drag gesture covers a few seconds, not the whole track.
+const SCRATCH_SECONDS_PER_REVOLUTION = 6
+// The scratch wheel's onDrag fires on every pointer move (much more often than the 200ms poll
+// used elsewhere) — seeking the real player and updating state on every tick would hammer the
+// postMessage bridge to the iframe for no perceptible benefit. Skipping seeks smaller than
+// this keeps the gesture responsive without seeking dozens of times per second.
+const SCRATCH_SEEK_THRESHOLD_SECONDS = 0.05
 
 export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, onActivate, onDurationResolved, ducking = false }) => {
   const containerId = `yt-player-${id}`
@@ -320,6 +330,49 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
     onStateChange((prev) => ({ ...prev, loopIn, loopOut, loopActive: true }))
   }
 
+  // The real turntable-scratch sound (pitch-bent, reversible audio) isn't reachable here — the
+  // track plays through YouTube's iframe, which exposes seekTo/play/pause but no raw audio
+  // buffer and no reverse playback. This approximates the *gesture*: pausing and seeking
+  // rapidly as the wheel turns produces the choppy "stutter" of a scratch, then resumes normal
+  // playback (if it was playing) wherever the gesture left off. All three handlers read/write
+  // via refs so they stay safe to pass straight into ScratchWheel's own ref-cached callbacks.
+  const scratchWasPlayingRef = useRef(false)
+  const scratchTimeRef = useRef(0)
+  const lastScratchSeekRef = useRef(0)
+
+  const handleScratchStart = () => {
+    if (!playerRef.current || !readyRef.current || !stateRef.current.track) return
+    scratchWasPlayingRef.current = stateRef.current.isPlaying
+    const current = playerRef.current.getCurrentTime()
+    scratchTimeRef.current = current
+    lastScratchSeekRef.current = current
+    playerRef.current.pauseVideo()
+    setSmoothPlayhead(false)
+  }
+
+  const handleScratchMove = (deltaDegrees: number) => {
+    const track = stateRef.current.track
+    if (!playerRef.current || !track) return
+    const deltaSeconds = (deltaDegrees / 360) * SCRATCH_SECONDS_PER_REVOLUTION
+    const next = Math.min(track.duration, Math.max(0, scratchTimeRef.current + deltaSeconds))
+    scratchTimeRef.current = next
+    if (Math.abs(next - lastScratchSeekRef.current) < SCRATCH_SEEK_THRESHOLD_SECONDS) return
+    lastScratchSeekRef.current = next
+    playerRef.current.seekTo(next, true)
+    onStateChange((prev) => ({ ...prev, currentTime: next }))
+  }
+
+  const handleScratchEnd = () => {
+    // The last move may have been skipped by the threshold above — land exactly where the
+    // gesture actually ended, not wherever the last *applied* seek happened to be.
+    if (playerRef.current && scratchTimeRef.current !== lastScratchSeekRef.current) {
+      playerRef.current.seekTo(scratchTimeRef.current, true)
+      onStateChange((prev) => ({ ...prev, currentTime: scratchTimeRef.current }))
+    }
+    setSmoothPlayhead(true)
+    if (scratchWasPlayingRef.current) playerRef.current?.playVideo()
+  }
+
   const duration = state.track?.duration ?? 1
   const progress = duration > 0 ? state.currentTime / duration : 0
   const color = accent[id]
@@ -404,18 +457,27 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
         <span className={cn(ledClass, 'justify-self-start text-xs')} title="Tiempo transcurrido">
           {formatTime(state.currentTime)}
         </span>
-        <button
-          type="button"
-          disabled={!ready}
-          onClick={() => togglePlay()}
-          title="Reproducir/Pausar"
-          className={cn(
-            'flex h-16 w-16 items-center justify-center rounded-full text-black shadow disabled:cursor-not-allowed disabled:opacity-40',
-            id === 'A' ? 'bg-lime-accent' : 'bg-aqua-accent',
-          )}
-        >
-          {state.isPlaying ? <Pause className="h-7 w-7" /> : <Play className="h-7 w-7 translate-x-0.5" />}
-        </button>
+        <div className="flex items-center gap-3">
+          <ScratchWheel
+            accent={color}
+            disabled={!ready || !state.track}
+            onScratchStart={handleScratchStart}
+            onScratchMove={handleScratchMove}
+            onScratchEnd={handleScratchEnd}
+          />
+          <button
+            type="button"
+            disabled={!ready}
+            onClick={() => togglePlay()}
+            title="Reproducir/Pausar"
+            className={cn(
+              'flex h-16 w-16 items-center justify-center rounded-full text-black shadow disabled:cursor-not-allowed disabled:opacity-40',
+              id === 'A' ? 'bg-lime-accent' : 'bg-aqua-accent',
+            )}
+          >
+            {state.isPlaying ? <Pause className="h-7 w-7" /> : <Play className="h-7 w-7 translate-x-0.5" />}
+          </button>
+        </div>
         <span className={cn(ledClass, 'justify-self-end text-xs')} title="Tiempo restante">
           -{formatTime(Math.max(0, duration - state.currentTime))}
         </span>

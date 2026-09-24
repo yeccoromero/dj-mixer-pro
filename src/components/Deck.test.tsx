@@ -15,6 +15,27 @@ vi.mock('./WavePanel', () => ({
   },
 }))
 
+// GSAP's Draggable rotation gesture isn't reliably reproducible by dispatching plain jsdom
+// pointer events — mocked the same way WavePanel's onSeek is above, so tests can drive the
+// scratch handlers directly instead of simulating an actual drag gesture.
+let capturedScratchProps: {
+  onScratchStart?: () => void
+  onScratchMove?: (deltaDegrees: number) => void
+  onScratchEnd?: () => void
+  disabled?: boolean
+} | null = null
+vi.mock('./ScratchWheel', () => ({
+  ScratchWheel: (props: {
+    onScratchStart?: () => void
+    onScratchMove?: (deltaDegrees: number) => void
+    onScratchEnd?: () => void
+    disabled?: boolean
+  }) => {
+    capturedScratchProps = props
+    return null
+  },
+}))
+
 vi.mock('@/lib/youtube', async () => {
   const actual = await vi.importActual<typeof import('@/lib/youtube')>('@/lib/youtube')
   return {
@@ -284,6 +305,75 @@ describe('Deck', () => {
     expect(mockPlayer.seekTo).toHaveBeenCalledWith(50, true) // 0.25 * 200s
     const updater = onStateChange.mock.calls[onStateChange.mock.calls.length - 1][0] as (s: DeckState) => DeckState
     expect(updater(baseState()).currentTime).toBe(50)
+  })
+
+  describe('scratch wheel', () => {
+    it('starting a scratch pauses the player, regardless of whether it was playing', async () => {
+      await renderReadyDeck(baseState({ isPlaying: true }))
+      mockPlayer.getCurrentTime.mockReturnValue(80)
+      act(() => capturedScratchProps?.onScratchStart?.())
+      expect(mockPlayer.pauseVideo).toHaveBeenCalled()
+    })
+
+    it('dragging seeks proportionally to the rotation once past the seek threshold', async () => {
+      const { onStateChange } = await renderReadyDeck(baseState({ isPlaying: true }))
+      mockPlayer.getCurrentTime.mockReturnValue(80)
+      act(() => capturedScratchProps?.onScratchStart?.())
+      act(() => capturedScratchProps?.onScratchMove?.(360)) // one full turn = 6s (SCRATCH_SECONDS_PER_REVOLUTION)
+
+      expect(mockPlayer.seekTo).toHaveBeenCalledWith(86, true)
+      const updater = onStateChange.mock.calls[onStateChange.mock.calls.length - 1][0] as (s: DeckState) => DeckState
+      expect(updater(baseState()).currentTime).toBe(86)
+    })
+
+    it('a tiny move under the seek threshold does not call seekTo immediately, but lands exactly on release', async () => {
+      await renderReadyDeck(baseState({ isPlaying: false }))
+      mockPlayer.getCurrentTime.mockReturnValue(80)
+      act(() => capturedScratchProps?.onScratchStart?.())
+      mockPlayer.seekTo.mockClear()
+      act(() => capturedScratchProps?.onScratchMove?.(1)) // ~0.0167s — under the 0.05s threshold
+      expect(mockPlayer.seekTo).not.toHaveBeenCalled()
+
+      act(() => capturedScratchProps?.onScratchEnd?.())
+      expect(mockPlayer.seekTo).toHaveBeenCalledTimes(1)
+      expect(mockPlayer.seekTo.mock.calls[0][0]).toBeCloseTo(80.0167, 3)
+    })
+
+    it('releasing resumes playback only if it was playing before the scratch started', async () => {
+      await renderReadyDeck(baseState({ isPlaying: true }))
+      mockPlayer.getCurrentTime.mockReturnValue(80)
+      act(() => capturedScratchProps?.onScratchStart?.())
+      act(() => capturedScratchProps?.onScratchMove?.(360))
+      act(() => capturedScratchProps?.onScratchEnd?.())
+      expect(mockPlayer.playVideo).toHaveBeenCalled()
+    })
+
+    it('releasing does not resume playback when it was already paused', async () => {
+      await renderReadyDeck(baseState({ isPlaying: false }))
+      mockPlayer.getCurrentTime.mockReturnValue(80)
+      act(() => capturedScratchProps?.onScratchStart?.())
+      act(() => capturedScratchProps?.onScratchMove?.(360))
+      act(() => capturedScratchProps?.onScratchEnd?.())
+      expect(mockPlayer.playVideo).not.toHaveBeenCalled()
+    })
+
+    it('clamps the scratched position to the track bounds instead of seeking past them', async () => {
+      await renderReadyDeck(baseState()) // duration 200
+      mockPlayer.getCurrentTime.mockReturnValue(199)
+      act(() => capturedScratchProps?.onScratchStart?.())
+      act(() => capturedScratchProps?.onScratchMove?.(360 * 10)) // way more than the track has left
+      expect(mockPlayer.seekTo).toHaveBeenLastCalledWith(200, true)
+
+      mockPlayer.getCurrentTime.mockReturnValue(1)
+      act(() => capturedScratchProps?.onScratchStart?.())
+      act(() => capturedScratchProps?.onScratchMove?.(-360 * 10))
+      expect(mockPlayer.seekTo).toHaveBeenLastCalledWith(0, true)
+    })
+
+    it('the wheel is disabled until the player is ready and a track is loaded', () => {
+      render(<Deck id="A" state={baseState()} onStateChange={vi.fn()} isActive onActivate={vi.fn()} />)
+      expect(capturedScratchProps?.disabled).toBe(true)
+    })
   })
 
   it('sets effective volume (crossfader volume x gain) once ready', async () => {
