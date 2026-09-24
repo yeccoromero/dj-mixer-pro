@@ -49,15 +49,23 @@ global entre componentes: toda la comunicación pasa por `DJMixer.tsx`.
 
 | Elemento | Función |
 |---|---|
-| Texto "DJ Mixer Pro" + imagen hero | Puramente decorativo, sin interacción. |
+| Texto "DJ Mixer Pro" | Puramente decorativo, sin interacción. |
+| Panel de Efectos (ver sección propia abajo) | Botonera de 4 efectos, ubicada a la derecha del título en pantallas anchas (arriba del título, centrada, en mobile) |
 
-**Tipografía pixel/8-bit, solo acá:** a partir de una imagen de referencia con un título estilo
-videojuego retro ("LET'S PLAY. TOGETHER"), se le dio al título principal la fuente
+**Tipografía pixel/8-bit, solo en el título:** a partir de una imagen de referencia con un título
+estilo videojuego retro ("LET'S PLAY. TOGETHER"), se le dio al título principal la fuente
 [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P) (Google Fonts), en mayúsculas.
 Pedido explícito: "solo eso en la parte superior, nada más" — así que se creó una clase nueva y
 separada (`.header-title` en `index.css`) en vez de tocar `.music-title`, que sigue usando Inter y
 también la usa el título del modal "Agregar pista" — cambiarla ahí habría afectado el modal, no
 solo el header.
+
+**Mismo ancho que los paneles de abajo:** el header y la grilla de tres columnas (Deck A / centro /
+Deck B) comparten un único contenedor `mx-auto max-w-7xl` — antes el header no tenía ese límite y
+quedaba más ancho que el resto de la interfaz, borde a borde de la pantalla, mientras los paneles
+de abajo sí estaban centrados y acotados. Alinearlos hace que el panel de Efectos, ahora ubicado
+en el header, quede visualmente asociado al resto de los controles en vez de flotar en una franja
+de otro ancho.
 
 ---
 
@@ -131,11 +139,28 @@ sin importar en qué posición estén Gain o crossfader en ese momento. Al solta
 instantáneamente al volumen normal. De paso se subió el volumen propio de cada efecto (Tone.js,
 `synth.volume.value`) unos 5dB para reforzar el mismo objetivo desde el otro lado.
 
-**Ubicación — debajo de la Biblioteca, no arriba de todo:** vivía como una barra propia a todo lo
-ancho, entre el header y los tres paneles principales — separado del resto y sin relación visual
-con ningún otro control. Pedido explícito de moverlo debajo de Biblioteca, dentro de la misma
-columna central. Se redujo a una botonera compacta (`grid grid-cols-4`, íconos y texto más chicos)
-para que las 4 acciones quepan en el ancho de esa columna en vez del ancho completo de la página.
+**Ubicación — historia de dos mudanzas:** primero vivió como una barra propia a todo lo ancho,
+entre el header y los tres paneles principales, sin relación visual con ningún otro control — se
+lo movió debajo de Biblioteca, dentro de la columna central, reducido a una botonera compacta
+(`grid grid-cols-4`). Con Sugeridos ocupando también esa columna, terminó como la tercera cosa
+apilada ahí abajo y costaba encontrarlo ("quedó perdida, ¿dónde podemos ubicarla?"). Se lo movió de
+nuevo, esta vez al **header**, junto al título — como panel `embedded` (prop nueva en
+`EffectsPanel`: cuando es `true`, no dibuja su propio `panel` con fondo/borde, para no quedar como
+una tarjeta dentro de otra tarjeta) alineado a la derecha del título en pantallas anchas (`lg:` y
+en adelante) y apilado arriba del título, centrado, en mobile. Al estar siempre visible arriba de
+todo (no hay que scrollear ni pasar por la biblioteca) queda igual de accesible desde cualquier
+punto de la sesión.
+
+**Hotkeys de teclado — 1, 2, 3, 4:** pedido explícito para poder dispararlos "sin mirar la
+pantalla", como un DJ real con las manos en otro lado. Cada tecla numérica mapea a un efecto en el
+mismo orden que la grilla visual (`1` Siren, `2` Airhorn, `3` Laser, `4` Radio) y respeta el mismo
+comportamiento de sostener/soltar que el mouse/touch: `keydown` arranca el efecto (ignorando
+`event.repeat`, que el sistema operativo dispara varias veces mientras se mantiene la tecla — sin
+ese filtro se llamaría a `startEffect` de nuevo en cada tick, inofensivo porque ya no reinicia el
+mismo efecto, pero innecesario) y `keydown`/`keyup` se ignoran por completo si el foco está en un
+campo de texto (el modal de agregar pista, por ejemplo), para no interferir con escribir un título
+o un link. Cada tecla queda dispuesta en la esquina de su botón como referencia visual, y el título
+del botón (`title`, tooltip nativo del navegador) también la menciona.
 
 ---
 

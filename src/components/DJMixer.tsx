@@ -170,61 +170,66 @@ export const DJMixer: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 space-y-6">
-      {/* Header */}
-      <motion.div
-        className="panel p-6"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <h1 className="header-title mb-2 text-center">DJ Mixer Pro</h1>
-        <p className="text-center text-sm text-muted-foreground">
-          Reproducción vía YouTube • Contenido sin modificar • Uso bajo Política de YouTube
-        </p>
-      </motion.div>
+    <div className="min-h-screen bg-background p-4">
+      <div className="mx-auto max-w-7xl space-y-6">
+        {/* Header + efectos, mismo ancho que los paneles de abajo */}
+        <motion.div
+          className="panel flex flex-col gap-5 p-6 lg:flex-row lg:items-center lg:justify-between"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="text-center lg:text-left">
+            <h1 className="header-title mb-2">DJ Mixer Pro</h1>
+            <p className="text-sm text-muted-foreground">
+              Reproducción vía YouTube • Contenido sin modificar • Uso bajo Política de YouTube
+            </p>
+          </div>
+          <div className="mx-auto w-full max-w-xs lg:mx-0 lg:w-auto">
+            <EffectsPanel embedded onEffectTrigger={handleEffectTrigger} onDuckingChange={setDucking} />
+          </div>
+        </motion.div>
 
-      {/* Layout principal */}
-      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Deck A */}
-        <div className="space-y-4">
-          <Deck
-            id="A"
-            state={deckA}
-            onStateChange={setDeckA}
-            isActive={activeDeck === 'A'}
-            onActivate={() => setActiveDeck('A')}
-            onDurationResolved={handleDurationResolved}
-            ducking={ducking}
-          />
-        </div>
+        {/* Layout principal */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* Deck A */}
+          <div className="space-y-4">
+            <Deck
+              id="A"
+              state={deckA}
+              onStateChange={setDeckA}
+              isActive={activeDeck === 'A'}
+              onActivate={() => setActiveDeck('A')}
+              onDurationResolved={handleDurationResolved}
+              ducking={ducking}
+            />
+          </div>
 
-        {/* Centro: Cross-fader y CoverFlow */}
-        <div className="space-y-6">
-          <CrossFader value={crossFaderValue} onChange={setCrossFaderValue} />
+          {/* Centro: Cross-fader y CoverFlow */}
+          <div className="space-y-6">
+            <CrossFader value={crossFaderValue} onChange={setCrossFaderValue} />
 
-          <CoverFlow
-            tracks={tracks}
-            selectedTrack={selectedTrack}
-            activeDeck={activeDeck}
-            onTrackSelect={handleTrackSelect}
-            onAddTrack={handleAddTrack}
-            onRemoveTrack={handleRemoveTrack}
-          />
+            <CoverFlow
+              tracks={tracks}
+              selectedTrack={selectedTrack}
+              activeDeck={activeDeck}
+              onTrackSelect={handleTrackSelect}
+              onAddTrack={handleAddTrack}
+              onRemoveTrack={handleRemoveTrack}
+            />
+          </div>
 
-          <EffectsPanel onEffectTrigger={handleEffectTrigger} onDuckingChange={setDucking} />
-        </div>
-
-        {/* Deck B */}
-        <div className="space-y-4">
-          <Deck
-            id="B"
-            state={deckB}
-            onStateChange={setDeckB}
-            isActive={activeDeck === 'B'}
-            onActivate={() => setActiveDeck('B')}
-            onDurationResolved={handleDurationResolved}
-            ducking={ducking}
-          />
+          {/* Deck B */}
+          <div className="space-y-4">
+            <Deck
+              id="B"
+              state={deckB}
+              onStateChange={setDeckB}
+              isActive={activeDeck === 'B'}
+              onActivate={() => setActiveDeck('B')}
+              onDurationResolved={handleDurationResolved}
+              ducking={ducking}
+            />
+          </div>
         </div>
       </div>
     </div>

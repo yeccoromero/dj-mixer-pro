@@ -19,7 +19,7 @@ describe('EffectsPanel', () => {
     const onEffectTrigger = vi.fn()
     render(<EffectsPanel onEffectTrigger={onEffectTrigger} />)
 
-    fireEvent.pointerDown(screen.getByTitle(`Mantener presionado para ${label}`))
+    fireEvent.pointerDown(screen.getByTitle(new RegExp(`^Mantener presionado para ${label} `)))
 
     expect(startEffect).toHaveBeenCalledWith(id)
     expect(onEffectTrigger).toHaveBeenCalledWith(id)
@@ -29,7 +29,7 @@ describe('EffectsPanel', () => {
   it('releasing anywhere on the page stops the held effect — like the Cue button, the pointer may have drifted off first', () => {
     render(<EffectsPanel onEffectTrigger={vi.fn()} />)
 
-    fireEvent.pointerDown(screen.getByTitle('Mantener presionado para Laser'))
+    fireEvent.pointerDown(screen.getByTitle(/^Mantener presionado para Laser /))
     expect(stopEffect).not.toHaveBeenCalled()
 
     fireEvent.pointerUp(window)
@@ -39,8 +39,8 @@ describe('EffectsPanel', () => {
   it('pressing a second pad while the first is still held stops the first one instead of layering both', () => {
     render(<EffectsPanel onEffectTrigger={vi.fn()} />)
 
-    fireEvent.pointerDown(screen.getByTitle('Mantener presionado para Siren'))
-    fireEvent.pointerDown(screen.getByTitle('Mantener presionado para Radio'))
+    fireEvent.pointerDown(screen.getByTitle(/^Mantener presionado para Siren /))
+    fireEvent.pointerDown(screen.getByTitle(/^Mantener presionado para Radio /))
 
     expect(stopEffect).toHaveBeenCalledWith('siren')
     expect(startEffect).toHaveBeenCalledWith('radio')
@@ -54,7 +54,7 @@ describe('EffectsPanel', () => {
   it('a pointercancel (e.g. the OS interrupting the gesture) also stops the held effect', () => {
     render(<EffectsPanel onEffectTrigger={vi.fn()} />)
 
-    fireEvent.pointerDown(screen.getByTitle('Mantener presionado para Airhorn'))
+    fireEvent.pointerDown(screen.getByTitle(/^Mantener presionado para Airhorn /))
     fireEvent.pointerCancel(window)
 
     expect(stopEffect).toHaveBeenCalledWith('airhorn')
@@ -64,7 +64,7 @@ describe('EffectsPanel', () => {
     const onDuckingChange = vi.fn()
     render(<EffectsPanel onEffectTrigger={vi.fn()} onDuckingChange={onDuckingChange} />)
 
-    fireEvent.pointerDown(screen.getByTitle('Mantener presionado para Siren'))
+    fireEvent.pointerDown(screen.getByTitle(/^Mantener presionado para Siren /))
     expect(onDuckingChange).toHaveBeenCalledExactlyOnceWith(true)
 
     fireEvent.pointerUp(window)
@@ -75,13 +75,75 @@ describe('EffectsPanel', () => {
     const onDuckingChange = vi.fn()
     render(<EffectsPanel onEffectTrigger={vi.fn()} onDuckingChange={onDuckingChange} />)
 
-    fireEvent.pointerDown(screen.getByTitle('Mantener presionado para Siren'))
+    fireEvent.pointerDown(screen.getByTitle(/^Mantener presionado para Siren /))
     onDuckingChange.mockClear()
 
-    fireEvent.pointerDown(screen.getByTitle('Mantener presionado para Radio'))
+    fireEvent.pointerDown(screen.getByTitle(/^Mantener presionado para Radio /))
     expect(onDuckingChange).not.toHaveBeenCalled()
 
     fireEvent.pointerUp(window)
     expect(onDuckingChange).toHaveBeenCalledExactlyOnceWith(false)
+  })
+
+  it.each([
+    ['1', 'siren'],
+    ['2', 'airhorn'],
+    ['3', 'laser'],
+    ['4', 'radio'],
+  ] as const)('holding key "%s" starts %s, releasing the key stops it', (key, id) => {
+    const onEffectTrigger = vi.fn()
+    render(<EffectsPanel onEffectTrigger={onEffectTrigger} />)
+
+    fireEvent.keyDown(window, { key })
+    expect(startEffect).toHaveBeenCalledWith(id)
+    expect(onEffectTrigger).toHaveBeenCalledWith(id)
+
+    fireEvent.keyUp(window, { key })
+    expect(stopEffect).toHaveBeenCalledWith(id)
+  })
+
+  it('OS key-repeat while holding a hotkey does not restart the effect', () => {
+    render(<EffectsPanel onEffectTrigger={vi.fn()} />)
+
+    fireEvent.keyDown(window, { key: '1' })
+    fireEvent.keyDown(window, { key: '1', repeat: true })
+    fireEvent.keyDown(window, { key: '1', repeat: true })
+
+    expect(startEffect).toHaveBeenCalledTimes(1)
+  })
+
+  it('releasing a key that is not the one currently held does not stop the active effect', () => {
+    render(<EffectsPanel onEffectTrigger={vi.fn()} />)
+
+    fireEvent.keyDown(window, { key: '1' })
+    fireEvent.keyUp(window, { key: '2' })
+
+    expect(stopEffect).not.toHaveBeenCalled()
+  })
+
+  it('an unmapped key is ignored', () => {
+    render(<EffectsPanel onEffectTrigger={vi.fn()} />)
+
+    fireEvent.keyDown(window, { key: 'a' })
+
+    expect(startEffect).not.toHaveBeenCalled()
+  })
+
+  it('hotkeys are ignored while typing in a text field', () => {
+    render(
+      <div>
+        <input type="text" data-testid="text-input" />
+        <EffectsPanel onEffectTrigger={vi.fn()} />
+      </div>,
+    )
+
+    fireEvent.keyDown(screen.getByTestId('text-input'), { key: '1' })
+
+    expect(startEffect).not.toHaveBeenCalled()
+  })
+
+  it('renders without its own panel card when embedded', () => {
+    const { container } = render(<EffectsPanel onEffectTrigger={vi.fn()} embedded />)
+    expect(container.querySelector('.panel')).not.toBeInTheDocument()
   })
 })
