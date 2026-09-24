@@ -12,7 +12,7 @@ Un DJ mixer profesional en el navegador construido con React, TypeScript, Tailwi
 - **Loop de 3 toques**: marca entrada, marca salida y activa, y desactiva — la pista se repite sola entre los dos puntos sin BPM ni cuantización
 - **Contador LED de tiempo transcurrido/restante** por deck, en tipografía de matriz de puntos (`DotGothic16`)
 - **Biblioteca en stack de tarjetas** (arrastrable/swipeable) con carátula a pantalla completa, duración visible, y opción de quitar pistas
-- **Modal para agregar pistas** desde cualquier URL o ID de YouTube, con verificación de que el video se pueda reproducir antes de agregarlo
+- **Modal para agregar pistas**, con dos pestañas: pegar una URL/ID de YouTube, o **buscar por palabra clave sin salir de la app** (usa la misma API que Sugeridos), ambas con verificación de que el video se pueda reproducir antes de agregarlo
 - **Sugeridos**: debajo de la biblioteca, una tira de videos similares en estilo a la pista activa (YouTube Data API v3, buscando por las etiquetas de género/estilo del video y cayendo al artista si no tiene), con un botón para agregarlos a la biblioteca en un toque; requiere una API key propia (ver [Variables de entorno](#variables-de-entorno)) y se degrada a no mostrar nada sin ella
 - **Panel de efectos** (Siren, Airhorn, Laser, Radio) sintetizados con Tone.js (distorsión, coro, delay, bitcrusher), ubicado en el header junto al título, con hotkeys de teclado (1, 2, 3, 4) para dispararlos sin usar el mouse
 - **Barra de posición minimalista**: una línea en el color del deck (no una onda falsa) marca el avance y se puede arrastrar para adelantar/retroceder, con una marca aparte para el punto de cue

@@ -82,7 +82,7 @@ export const CoverFlow: React.FC<CoverFlowProps> = ({
     <div className="panel flex flex-col gap-4 p-5">
       <div className="flex items-center justify-between">
         <span className="music-body">Biblioteca</span>
-        <AddTrackModal onAddTrack={onAddTrack} />
+        <AddTrackModal onAddTrack={onAddTrack} existingTrackIds={tracks.map((t) => t.youtubeId)} />
       </div>
 
       <div className="relative flex h-52 items-center justify-center overflow-hidden" style={{ perspective: 900 }}>

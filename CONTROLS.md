@@ -411,6 +411,26 @@ borrarla, verificar que no explota).
 | **Campos Título / Artista / Duración** | Se autocompletan desde YouTube si es posible (ver abajo); si quedan vacíos al enviar, se usan valores por defecto ("Pista sin título", "Artista desconocido", 180s). Editable en cualquier momento — lo que ya escribiste a mano nunca se sobrescribe |
 | **Botón "Añadir a la biblioteca"** | Valida el formato del link; si es inválido muestra un error inline. Si es un link de YouTube Shorts, lo rechaza de entrada (ver abajo). Si el formato es válido, antes de agregarla **verifica que el video realmente se pueda reproducir aquí** (ver abajo); mientras verifica, el botón cambia a "Verificando que se pueda reproducir…" y queda deshabilitado. Si pasa la verificación, construye un `Track`, llama `onAddTrack(track)`, cierra el modal y limpia el formulario. Si no pasa, muestra el motivo exacto y el modal queda abierto con los datos intactos para probar otro link |
 
+**Pestaña "Buscar" — no hace falta salir a YouTube:** pedido explícito ("¿se puede incluir un
+buscador para no ir a YouTube?"). El modal se dividió en dos pestañas, **Link** (el formulario
+original de arriba) y **Buscar** — un toggle simple (`mode: 'link' | 'search'`, sin routing) que
+alterna qué formulario se muestra, sin perder el estado del otro.
+
+| Control (pestaña Buscar) | Qué hace |
+|---|---|
+| **Campo de búsqueda + botón "Buscar"** | Busca por texto libre (título, artista, lo que sea) vía `searchSuggestedVideos` (la misma función de `lib/youtubeSuggestions.ts` que usa Sugeridos) y muestra los resultados como una lista con miniatura |
+| **Botón "+" sobre un resultado** | Verifica reproducibilidad (mismo chequeo que el formulario de link) y, si pasa, agrega la pista directamente — sin cerrar el modal, para poder seguir buscando y agregar varias de una sola búsqueda |
+
+**Búsqueda explícita, no autocompletar tecla por tecla:** a diferencia de Sugeridos (que busca
+sola con debounce cuando cambia la pista activa), acá la búsqueda solo se dispara al enviar el
+formulario (botón "Buscar" o Enter) — cada búsqueda cuesta 100 de las ~10.000 unidades diarias de
+cuota, así que autobuscar en cada tecla tipeada agotaría la cuota en una sola palabra escrita.
+
+**Resultados ya agregados desaparecen de la lista:** igual que Sugeridos, los resultados se
+filtran contra `existingTrackIds` (los IDs de YouTube ya en la biblioteca, pasados desde
+`CoverFlow.tsx`) — apenas se agrega uno, desaparece de la lista de resultados visibles, como
+confirmación visual de que ya está en la biblioteca, sin tener que volver a buscar.
+
 **Los links de YouTube Shorts se rechazan (`lib/youtubeId.ts#isYouTubeShortsUrl`):** YouTube sirve
 los Shorts, incluso a través de la IFrame API oficial, con su propia interfaz obligatoria
 encima del video (título, avatar del canal, botón de compartir, subtítulos, el logo de

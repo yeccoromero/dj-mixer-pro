@@ -10,13 +10,26 @@ vi.mock('@/lib/youtubeEmbedCheck', () => ({
   checkVideoEmbeddable: vi.fn(),
 }))
 
+vi.mock('@/lib/youtubeSuggestions', () => ({
+  searchSuggestedVideos: vi.fn(),
+}))
+
 import { fetchYouTubeOembed } from '@/lib/youtubeOembed'
 import { checkVideoEmbeddable } from '@/lib/youtubeEmbedCheck'
+import { searchSuggestedVideos } from '@/lib/youtubeSuggestions'
+
+const searchResult = {
+  youtubeId: 'ccccccccccc',
+  title: 'A Search Result',
+  channelTitle: 'Some Channel',
+  thumbnail: 'c.jpg',
+}
 
 describe('AddTrackModal', () => {
   beforeEach(() => {
     vi.mocked(fetchYouTubeOembed).mockReset().mockResolvedValue(null)
     vi.mocked(checkVideoEmbeddable).mockReset().mockResolvedValue({ playable: true })
+    vi.mocked(searchSuggestedVideos).mockReset().mockResolvedValue([])
   })
 
   it('shows a validation error and does not call onAddTrack for an invalid link', () => {
@@ -161,5 +174,96 @@ describe('AddTrackModal', () => {
 
     await waitFor(() => expect(fetchYouTubeOembed).toHaveBeenCalled())
     expect(screen.getByLabelText('Título')).toHaveValue('')
+  })
+
+  describe('search tab', () => {
+    it('searches on submit and lets you add a result', async () => {
+      vi.mocked(searchSuggestedVideos).mockResolvedValue([searchResult])
+      const onAddTrack = vi.fn()
+      render(<AddTrackModal onAddTrack={onAddTrack} existingTrackIds={['some-other-id']} />)
+
+      fireEvent.click(screen.getByText('Agregar pista'))
+      fireEvent.click(screen.getByText('Buscar'))
+      fireEvent.change(screen.getByLabelText('Buscar en YouTube'), { target: { value: 'deep house mix' } })
+      fireEvent.submit(screen.getByLabelText('Buscar en YouTube').closest('form')!)
+
+      await waitFor(() => expect(searchSuggestedVideos).toHaveBeenCalledWith('deep house mix', ['some-other-id']))
+      expect(await screen.findByText('A Search Result')).toBeInTheDocument()
+
+      fireEvent.click(screen.getByTitle('Agregar "A Search Result" a la biblioteca'))
+      await waitFor(() => expect(onAddTrack).toHaveBeenCalledTimes(1))
+      expect(checkVideoEmbeddable).toHaveBeenCalledWith('ccccccccccc')
+      const track = onAddTrack.mock.calls[0][0]
+      expect(track.youtubeId).toBe('ccccccccccc')
+      expect(track.title).toBe('A Search Result')
+      expect(track.artist).toBe('Some Channel')
+    })
+
+    it('does not search on an empty query', () => {
+      render(<AddTrackModal onAddTrack={vi.fn()} />)
+
+      fireEvent.click(screen.getByText('Agregar pista'))
+      fireEvent.click(screen.getByText('Buscar'))
+      fireEvent.submit(screen.getByLabelText('Buscar en YouTube').closest('form')!)
+
+      expect(searchSuggestedVideos).not.toHaveBeenCalled()
+    })
+
+    it('blocks adding a search result that is not embeddable, showing why', async () => {
+      vi.mocked(searchSuggestedVideos).mockResolvedValue([searchResult])
+      vi.mocked(checkVideoEmbeddable).mockResolvedValue({ playable: false, reason: 'bloqueado por el sello' })
+      const onAddTrack = vi.fn()
+      render(<AddTrackModal onAddTrack={onAddTrack} />)
+
+      fireEvent.click(screen.getByText('Agregar pista'))
+      fireEvent.click(screen.getByText('Buscar'))
+      fireEvent.change(screen.getByLabelText('Buscar en YouTube'), { target: { value: 'blocked track' } })
+      fireEvent.submit(screen.getByLabelText('Buscar en YouTube').closest('form')!)
+      await screen.findByText('A Search Result')
+
+      fireEvent.click(screen.getByTitle('Agregar "A Search Result" a la biblioteca'))
+      await waitFor(() => expect(screen.getByText(/bloqueado por el sello/)).toBeInTheDocument())
+      expect(onAddTrack).not.toHaveBeenCalled()
+    })
+
+    it('a result already in the library (existingTrackIds) does not render', async () => {
+      vi.mocked(searchSuggestedVideos).mockResolvedValue([searchResult])
+      render(<AddTrackModal onAddTrack={vi.fn()} existingTrackIds={[searchResult.youtubeId]} />)
+
+      fireEvent.click(screen.getByText('Agregar pista'))
+      fireEvent.click(screen.getByText('Buscar'))
+      fireEvent.change(screen.getByLabelText('Buscar en YouTube'), { target: { value: 'anything' } })
+      fireEvent.submit(screen.getByLabelText('Buscar en YouTube').closest('form')!)
+
+      await waitFor(() => expect(searchSuggestedVideos).toHaveBeenCalled())
+      expect(screen.queryByText('A Search Result')).not.toBeInTheDocument()
+    })
+
+    it('shows a message when the search returns nothing', async () => {
+      vi.mocked(searchSuggestedVideos).mockResolvedValue([])
+      render(<AddTrackModal onAddTrack={vi.fn()} />)
+
+      fireEvent.click(screen.getByText('Agregar pista'))
+      fireEvent.click(screen.getByText('Buscar'))
+      fireEvent.change(screen.getByLabelText('Buscar en YouTube'), { target: { value: 'nothing found' } })
+      fireEvent.submit(screen.getByLabelText('Buscar en YouTube').closest('form')!)
+
+      await waitFor(() => expect(screen.getByText(/Sin resultados/)).toBeInTheDocument())
+    })
+
+    it('switching back to the Link tab keeps the link form working as before', async () => {
+      const onAddTrack = vi.fn()
+      render(<AddTrackModal onAddTrack={onAddTrack} />)
+
+      fireEvent.click(screen.getByText('Agregar pista'))
+      fireEvent.click(screen.getByText('Buscar'))
+      fireEvent.click(screen.getByText('Link'))
+      fireEvent.change(screen.getByLabelText('URL o ID de YouTube'), {
+        target: { value: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
+      })
+      fireEvent.click(screen.getByText('Añadir a la biblioteca'))
+
+      await waitFor(() => expect(onAddTrack).toHaveBeenCalledTimes(1))
+    })
   })
 })

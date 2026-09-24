@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Loader2, Plus } from 'lucide-react'
+import { Loader2, Plus, Search } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -13,14 +13,21 @@ import { Label } from '@/components/ui/label'
 import { extractYouTubeId, isYouTubeShortsUrl } from '@/lib/youtubeId'
 import { fetchYouTubeOembed } from '@/lib/youtubeOembed'
 import { checkVideoEmbeddable } from '@/lib/youtubeEmbedCheck'
+import { searchSuggestedVideos, type SuggestedVideo } from '@/lib/youtubeSuggestions'
+import { cn } from '@/lib/utils'
 import type { Track } from './DJMixer'
 
 interface AddTrackModalProps {
   onAddTrack: (track: Track) => void
+  /** YouTube ids already in the library, so a search result already added shows as gone
+   * instead of offering to add a duplicate. Defaults to none for callers that don't track it
+   * (the empty-library screen, which by definition has nothing to exclude). */
+  existingTrackIds?: readonly string[]
 }
 
-export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack }) => {
+export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack, existingTrackIds = [] }) => {
   const [open, setOpen] = useState(false)
+  const [mode, setMode] = useState<'link' | 'search'>('link')
   const [url, setUrl] = useState('')
   const [title, setTitle] = useState('')
   const [artist, setArtist] = useState('')
@@ -30,7 +37,14 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack }) => {
   const [fetchingMeta, setFetchingMeta] = useState(false)
   const [checkingEmbed, setCheckingEmbed] = useState(false)
 
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<SuggestedVideo[]>([])
+  const [searching, setSearching] = useState(false)
+  const [searched, setSearched] = useState(false)
+  const [addingId, setAddingId] = useState<string | null>(null)
+
   const reset = () => {
+    setMode('link')
     setUrl('')
     setTitle('')
     setArtist('')
@@ -39,6 +53,11 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack }) => {
     setError(null)
     setFetchingMeta(false)
     setCheckingEmbed(false)
+    setSearchQuery('')
+    setSearchResults([])
+    setSearching(false)
+    setSearched(false)
+    setAddingId(null)
   }
 
   const handleUrlBlur = async () => {
@@ -96,6 +115,53 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack }) => {
     setOpen(false)
   }
 
+  // Explicit submit (button click or Enter), not search-as-you-type: each search costs 100 of
+  // the ~10,000 daily quota units, so firing one per keystroke would burn through it in a
+  // single query typed out.
+  const handleSearchSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    const trimmed = searchQuery.trim()
+    if (!trimmed) return
+
+    setError(null)
+    setSearching(true)
+    const results = await searchSuggestedVideos(trimmed, existingTrackIds)
+    setSearchResults(results)
+    setSearching(false)
+    setSearched(true)
+  }
+
+  const handleAddFromSearch = async (video: SuggestedVideo) => {
+    setAddingId(video.youtubeId)
+    setError(null)
+    const check = await checkVideoEmbeddable(video.youtubeId)
+    setAddingId(null)
+
+    if (!check.playable) {
+      setError(`"${video.title}" no se puede reproducir aquí: ${check.reason ?? 'video bloqueado'}`)
+      return
+    }
+
+    // oxlint's purity check misflags this as running during render (it only runs when a
+    // result's "+" is clicked, same event-handler shape as the identical pattern in
+    // SuggestedTracks.tsx's handleAdd, which the same rule does not flag).
+    // eslint-disable-next-line react/purity
+    const id = `${video.youtubeId}-${Date.now()}`
+    onAddTrack({
+      id,
+      title: video.title,
+      artist: video.channelTitle,
+      youtubeId: video.youtubeId,
+      duration: 180,
+      thumbnail: video.thumbnail,
+    })
+  }
+
+  // Results already added (in existingTrackIds) drop out instead of offering a duplicate —
+  // the same pattern SuggestedTracks uses, so a track just added visibly disappears from the
+  // list as confirmation, without needing to re-run the search.
+  const visibleSearchResults = searchResults.filter((video) => !existingTrackIds.includes(video.youtubeId))
+
   return (
     <Dialog
       open={open}
@@ -114,9 +180,90 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack }) => {
         <DialogHeader>
           <DialogTitle>Agregar pista de YouTube</DialogTitle>
           <DialogDescription>
-            Pega el enlace de un video de YouTube para añadirlo a la biblioteca.
+            {mode === 'link'
+              ? 'Pega el enlace de un video de YouTube para añadirlo a la biblioteca.'
+              : 'Buscá por título, artista o palabra clave sin salir de la app.'}
           </DialogDescription>
         </DialogHeader>
+
+        <div className="flex gap-1 rounded-md bg-muted p-1">
+          <button
+            type="button"
+            onClick={() => setMode('link')}
+            className={cn(
+              'flex-1 rounded py-1.5 text-sm font-medium transition-colors',
+              mode === 'link' ? 'bg-background shadow-sm' : 'text-muted-foreground',
+            )}
+          >
+            Link
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('search')}
+            className={cn(
+              'flex-1 rounded py-1.5 text-sm font-medium transition-colors',
+              mode === 'search' ? 'bg-background shadow-sm' : 'text-muted-foreground',
+            )}
+          >
+            Buscar
+          </button>
+        </div>
+
+        {mode === 'search' ? (
+          <div className="flex flex-col gap-3">
+            <form onSubmit={handleSearchSubmit} className="flex gap-2">
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Título, artista, remix..."
+                aria-label="Buscar en YouTube"
+                className="h-10 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+              />
+              <Button type="submit" variant="outline" className="gap-2" disabled={searching || !searchQuery.trim()}>
+                {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                Buscar
+              </Button>
+            </form>
+
+            {error && <p className="text-sm text-destructive">{error}</p>}
+
+            {searched && !searching && visibleSearchResults.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Sin resultados (o falta configurar la API de búsqueda — ver .env.example).
+              </p>
+            )}
+
+            <div className="flex max-h-80 flex-col gap-2 overflow-y-auto">
+              {visibleSearchResults.map((video) => (
+                <div key={video.youtubeId} className="flex items-center gap-3 rounded-md border border-border p-2">
+                  <img
+                    src={video.thumbnail}
+                    alt={video.title}
+                    className="h-12 w-20 shrink-0 rounded object-cover"
+                    draggable={false}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{video.title}</p>
+                    <p className="truncate text-xs text-muted-foreground">{video.channelTitle}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleAddFromSearch(video)}
+                    disabled={addingId === video.youtubeId}
+                    title={`Agregar "${video.title}" a la biblioteca`}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-lime-accent text-black shadow disabled:opacity-60"
+                  >
+                    {addingId === video.youtubeId ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Plus className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
             <Label htmlFor="track-url">URL o ID de YouTube</Label>
@@ -174,6 +321,7 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack }) => {
             {checkingEmbed ? 'Verificando que se pueda reproducir…' : 'Añadir a la biblioteca'}
           </Button>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   )
