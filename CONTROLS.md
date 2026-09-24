@@ -431,6 +431,19 @@ cuota, así que autobuscar en cada tecla tipeada agotaría la cuota en una sola 
 limpiar). Un `useEffect` sobre el estado `mode` enfoca el campo de búsqueda apenas se activa la
 pestaña Buscar, así se puede empezar a tipear de inmediato sin un clic extra en el campo.
 
+**Espacios e inconsistencia de bordes — corregido:** reporte real del usuario tras ver el modal en
+producción ("está muy pegado, no hay coherencia, botones rectos otros cerrados"). Dos problemas
+distintos:
+- El toggle Link/Buscar usaba `rounded` (esquinas apenas curvas) mientras que el resto de los
+  botones del modal (`Añadir a la biblioteca`, el botón "Buscar" de la búsqueda, el "+" sobre cada
+  resultado) usan el componente `Button` compartido, que es `rounded-full` (píldora) — quedaba un
+  control con una forma completamente distinta al resto. Se cambió el toggle a `rounded-full`
+  también, tanto el contenedor como cada botón interno.
+- No había separación consistente entre el header del modal, el toggle de pestañas y el contenido
+  de cada una — quedaban pegados unos a otros. Se envolvió todo debajo del header en un contenedor
+  con `flex flex-col gap-4` y se subió el espaciado interno de ambos formularios (Link y Buscar) de
+  `gap-3` a `gap-4`, para que cada sección respire lo mismo en todo el modal.
+
 **Rediseño visual — grilla en vez de lista, miniaturas más grandes:** mismo pedido. Los resultados
 pasaron de una lista vertical con miniaturas chicas (80×48px) a una grilla de 2 columnas con
 miniatura a lo ancho de la tarjeta (`aspect-video`), título en hasta 2 líneas (`line-clamp-2`) y

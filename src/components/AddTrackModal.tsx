@@ -201,31 +201,32 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack, existi
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex gap-1 rounded-md bg-muted p-1">
-          <button
-            type="button"
-            onClick={() => setMode('link')}
-            className={cn(
-              'flex-1 rounded py-1.5 text-sm font-medium transition-colors',
-              mode === 'link' ? 'bg-background shadow-sm' : 'text-muted-foreground',
-            )}
-          >
-            Link
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('search')}
-            className={cn(
-              'flex-1 rounded py-1.5 text-sm font-medium transition-colors',
-              mode === 'search' ? 'bg-background shadow-sm' : 'text-muted-foreground',
-            )}
-          >
-            Buscar
-          </button>
-        </div>
+        <div className="mt-4 flex flex-col gap-4">
+          <div className="flex gap-1 rounded-full bg-muted p-1">
+            <button
+              type="button"
+              onClick={() => setMode('link')}
+              className={cn(
+                'flex-1 rounded-full py-1.5 text-sm font-medium transition-colors',
+                mode === 'link' ? 'bg-background shadow-sm' : 'text-muted-foreground',
+              )}
+            >
+              Link
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('search')}
+              className={cn(
+                'flex-1 rounded-full py-1.5 text-sm font-medium transition-colors',
+                mode === 'search' ? 'bg-background shadow-sm' : 'text-muted-foreground',
+              )}
+            >
+              Buscar
+            </button>
+          </div>
 
         {mode === 'search' ? (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4">
             <form onSubmit={handleSearchSubmit} className="flex gap-2">
               <div className="relative flex-1">
                 <input
@@ -300,7 +301,7 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack, existi
             </div>
           </div>
         ) : (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <Label htmlFor="track-url">URL o ID de YouTube</Label>
             <div className="relative">
@@ -358,6 +359,7 @@ export const AddTrackModal: React.FC<AddTrackModalProps> = ({ onAddTrack, existi
           </Button>
         </form>
         )}
+        </div>
       </DialogContent>
     </Dialog>
   )
