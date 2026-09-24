@@ -1,15 +1,27 @@
-import * as Tone from 'tone'
-
 export type EffectId = 'siren' | 'airhorn' | 'laser' | 'radio'
 
-// Tone.js needs the audio context actually running before anything connected to it makes
-// sound, same as the raw AudioContext.resume() the previous version called by hand — the
-// only difference is Tone.start() also does its own internal setup. Must be triggered
-// synchronously from the pointerdown handler that calls it, or the browser's autoplay policy
-// blocks it; startEffect below preserves that by starting the async chain directly inside
-// the same call stack as the press.
+type ToneModule = typeof import('tone')
+
+// Tone.js is the single heaviest dependency in this app (~250kB+ of the shipped bundle) and
+// most visits never touch it — nobody has held down an FX pad yet. Dynamically imported so it
+// only downloads the first time someone actually presses one, instead of blocking every
+// visitor's initial page load for a feature most of them won't use in that session.
+//
+// Trade-off worth naming: `Tone.start()` (below) has to run inside the browser's autoplay
+// "user gesture" window, and adding this import before it means the very first press ever
+// waits on a network/parse hop before that call fires. In practice this chunk is same-origin
+// and typically resolves in well under the window Chrome/Firefox allow; Safari is stricter
+// about this than other browsers, so on a slow connection the very first press there could
+// occasionally get silently blocked, needing a second press to actually start sound. Every
+// press after the first reuses the cached promise below and pays none of this cost.
+let tonePromise: Promise<ToneModule> | null = null
+function loadTone(): Promise<ToneModule> {
+  if (!tonePromise) tonePromise = import('tone')
+  return tonePromise
+}
+
 let started = false
-async function ensureAudioStarted() {
+async function ensureAudioStarted(Tone: ToneModule) {
   if (started) return
   await Tone.start()
   started = true
@@ -29,12 +41,14 @@ const live = new Map<EffectId, LiveEffect>()
 
 export function startEffect(effect: EffectId) {
   if (live.has(effect)) return
-  void ensureAudioStarted().then(() => {
-    // The button may have already been released before the context finished starting —
-    // don't begin a sound nobody is holding down anymore.
-    if (live.has(effect)) return
-    live.set(effect, buildEffect(effect))
-  })
+  void loadTone()
+    .then((Tone) => ensureAudioStarted(Tone).then(() => Tone))
+    .then((Tone) => {
+      // The button may have already been released before Tone loaded/the context finished
+      // starting — don't begin a sound nobody is holding down anymore.
+      if (live.has(effect)) return
+      live.set(effect, buildEffect(effect, Tone))
+    })
 }
 
 export function stopEffect(effect: EffectId) {
@@ -44,23 +58,23 @@ export function stopEffect(effect: EffectId) {
   instance.stop()
 }
 
-function buildEffect(effect: EffectId): LiveEffect {
+function buildEffect(effect: EffectId, Tone: ToneModule): LiveEffect {
   switch (effect) {
     case 'siren':
-      return buildSiren()
+      return buildSiren(Tone)
     case 'airhorn':
-      return buildAirhorn()
+      return buildAirhorn(Tone)
     case 'laser':
-      return buildLaser()
+      return buildLaser(Tone)
     case 'radio':
-      return buildRadio()
+      return buildRadio(Tone)
   }
 }
 
 // A wailing alarm that gets faster and higher-pitched the longer it's held — like leaning on
 // a real DJ siren pad — instead of a fixed sweep that just plays the same shape once.
 // Releasing resolves it with one last downward sweep instead of cutting off mid-wail.
-function buildSiren(): LiveEffect {
+function buildSiren(Tone: ToneModule): LiveEffect {
   const vibrato = new Tone.Vibrato({ frequency: 7, depth: 0.12 }).toDestination()
   const synth = new Tone.Synth({
     oscillator: { type: 'sine' },
@@ -105,7 +119,7 @@ function buildSiren(): LiveEffect {
 // The classic "BWAAAH" sustains for as long as the button is held, same as a real airhorn —
 // two detuned notes on a sawtooth voice through chorus (widens it) and light distortion
 // (grit), instead of two plain oscillators fixed to a single short duration.
-function buildAirhorn(): LiveEffect {
+function buildAirhorn(Tone: ToneModule): LiveEffect {
   const distortion = new Tone.Distortion({ distortion: 0.35, wet: 0.4 }).toDestination()
   const chorus = new Tone.Chorus({ frequency: 1.5, depth: 0.5, wet: 0.35 }).connect(distortion)
   chorus.start()
@@ -131,7 +145,7 @@ function buildAirhorn(): LiveEffect {
 // Rapid-fire zaps while held — a laser gun, not one "pew" — each with a short ping-pong
 // delay tail and a bit of randomized pitch so a held burst doesn't sound like the exact same
 // sample looping.
-function buildLaser(): LiveEffect {
+function buildLaser(Tone: ToneModule): LiveEffect {
   const delay = new Tone.PingPongDelay({ delayTime: 0.05, feedback: 0.25, wet: 0.25 }).toDestination()
   const synth = new Tone.Synth({
     oscillator: { type: 'square' },
@@ -162,7 +176,7 @@ function buildLaser(): LiveEffect {
 // Filtered noise that keeps going while held, with the bandpass frequency wandering like
 // someone scanning a dial — a bitcrusher ahead of the filter gives it the gritty, low-bitrate
 // crackle of an actual radio signal instead of one clean static burst.
-function buildRadio(): LiveEffect {
+function buildRadio(Tone: ToneModule): LiveEffect {
   const filter = new Tone.Filter({ type: 'bandpass', frequency: 1200, Q: 1.5 }).toDestination()
   const crush = new Tone.BitCrusher(5).connect(filter)
   const noise = new Tone.Noise('white').connect(crush)

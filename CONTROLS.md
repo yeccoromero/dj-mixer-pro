@@ -126,6 +126,21 @@ documento). Cada efecto crea su propia cadena de nodos al dispararse y los desca
 un momento después de terminar de sonar — son sonidos puntuales, no instrumentos persistentes, así
 que no hay razón para que ocupen memoria una vez que terminaron.
 
+**Tone.js se carga bajo demanda, no al abrir la app:** es la dependencia más pesada de todo el
+proyecto (~340KB), y la mayoría de las visitas nunca tocan un botón de efecto en esa sesión.
+`lib/effectSounds.ts` usa un `import('tone')` dinámico (cacheado en una promesa a partir de la
+primera llamada) en vez del `import * as Tone from 'tone'` estático original — Vite lo separa solo
+en su propio chunk automáticamente, que recién se pide la primera vez que se sostiene un pad de
+efecto. Confirmado en el navegador: cero pedidos de red a ese chunk antes de tocar un efecto, uno
+solo justo al presionar el primero. Bajó el bundle principal de 834KB a 580KB (gzip: 253KB → 191KB).
+Costo real de esto: `Tone.start()` (necesario para que el audio suene, por la política de autoplay
+del navegador) tiene que dispararse dentro de la ventana de "gesto del usuario" del pointerdown —
+agregar esta carga dinámica antes mete un salto de red/parseo extra en la primerísima vez que se
+presiona un efecto en toda la sesión, que en Safari (más estricto que Chrome/Firefox con esto)
+ocasionalmente podría no alcanzar a contar como parte del mismo gesto en una conexión lenta,
+necesitando un segundo toque. Cada toque siguiente reutiliza la promesa ya cacheada y no paga este
+costo.
+
 **Ducking — el efecto se escucha más fuerte que la música:** pedido explícito ("los efectos...
 deben ser más altos en sonido que el audio"). Los efectos suenan por un camino de audio
 completamente separado del video de YouTube (Tone.js/Web Audio API vs el audio nativo del iframe),
