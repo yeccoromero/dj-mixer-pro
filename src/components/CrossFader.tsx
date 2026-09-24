@@ -5,6 +5,19 @@ import { cn } from '@/lib/utils'
 interface CrossFaderProps {
   value: number // 0 (full A) - 100 (full B)
   onChange: (value: number) => void
+  /** True while `value` is being driven by an animated transition from outside (Auto DJ's
+   * crossfade) rather than a one-off jump like the "Centrar" button — skips the handle's own
+   * 0.5s "settle" tween so it doesn't re-animate on every single step of an already-smooth
+   * external animation, which would lag behind and stutter instead of gliding. */
+  instant?: boolean
+  /** Fires the moment the user grabs the handle — Auto DJ listens for this to cede control
+   * back immediately instead of fighting a manual drag with its own transition. */
+  onDragStart?: () => void
+  autoDj?: boolean
+  onAutoDjChange?: (enabled: boolean) => void
+  /** True while Auto DJ is actively crossfading — shown next to the toggle so it's clear
+   * *why* the fader is moving on its own. */
+  autoDjTransitioning?: boolean
 }
 
 /** Piecewise-linear interpolation between named stops, e.g. [[0,1],[50,0.5],[100,0.15]]. */
@@ -20,7 +33,15 @@ function lerpStops(value: number, stops: [number, number][]) {
   return stops[stops.length - 1][1]
 }
 
-export const CrossFader: React.FC<CrossFaderProps> = ({ value, onChange }) => {
+export const CrossFader: React.FC<CrossFaderProps> = ({
+  value,
+  onChange,
+  instant = false,
+  onDragStart,
+  autoDj = false,
+  onAutoDjChange,
+  autoDjTransitioning = false,
+}) => {
   const trackRef = useRef<HTMLDivElement>(null)
   const handleRef = useRef<HTMLDivElement>(null)
   const draggableRef = useRef<Draggable | null>(null)
@@ -29,6 +50,8 @@ export const CrossFader: React.FC<CrossFaderProps> = ({ value, onChange }) => {
 
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
+  const onDragStartRef = useRef(onDragStart)
+  onDragStartRef.current = onDragStart
 
   // Create the Draggable once: the handle slides along the track (type: "x"), bounded
   // to stay inside it, with InertiaPlugin so a quick flick keeps gliding after release
@@ -52,6 +75,7 @@ export const CrossFader: React.FC<CrossFaderProps> = ({ value, onChange }) => {
       onPress: () => {
         isDraggingRef.current = true
         setIsDragging(true)
+        onDragStartRef.current?.()
       },
       onDrag: reportFromX,
       onThrowUpdate: reportFromX,
@@ -74,8 +98,12 @@ export const CrossFader: React.FC<CrossFaderProps> = ({ value, onChange }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Keep the handle in sync when `value` changes from outside (the "Centrar" button),
-  // animating smoothly — but never while the user is actively dragging it.
+  // Keep the handle in sync when `value` changes from outside — a one-off jump (the
+  // "Centrar" button) animates smoothly over 0.5s, but Auto DJ's crossfade drives `value`
+  // itself at its own pace many times a second (`instant`), so re-triggering a fresh 0.5s
+  // tween on every single step would lag behind and stutter instead of gliding — for that
+  // case this just snaps to the exact value, since the real animation already happened one
+  // level up. Never runs at all while the user is actively dragging it.
   useEffect(() => {
     if (isDraggingRef.current) return
     const track = trackRef.current
@@ -83,13 +111,18 @@ export const CrossFader: React.FC<CrossFaderProps> = ({ value, onChange }) => {
     const draggable = draggableRef.current
     if (!track || !handle || !draggable) return
     const maxX = Math.max(1, track.offsetWidth - handle.offsetWidth)
-    gsap.to(handle, {
-      x: (value / 100) * maxX,
-      duration: 0.5,
-      ease: 'power3.out',
-      onUpdate: () => draggable.update(),
-    })
-  }, [value])
+    if (instant) {
+      gsap.set(handle, { x: (value / 100) * maxX })
+      draggable.update()
+    } else {
+      gsap.to(handle, {
+        x: (value / 100) * maxX,
+        duration: 0.5,
+        ease: 'power3.out',
+        onUpdate: () => draggable.update(),
+      })
+    }
+  }, [value, instant])
 
   // Clicking anywhere on the track (not grabbing the handle itself) jumps the fader
   // there directly — GSAP's Draggable only owns the handle, so this restores the
@@ -146,6 +179,27 @@ export const CrossFader: React.FC<CrossFaderProps> = ({ value, onChange }) => {
           )}
           style={{ top: 'calc(50% - 14px)' }}
         />
+      </div>
+
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+          Auto DJ{autoDjTransitioning ? ' — transición…' : ''}
+        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={autoDj}
+          onClick={() => onAutoDjChange?.(!autoDj)}
+          title="Cuando la pista que suena está por terminar, cruza sola al otro deck si tiene una pista cargada"
+          className={cn('relative h-6 w-11 rounded-full transition-colors', autoDj ? 'bg-lime-accent' : 'bg-muted')}
+        >
+          <span
+            className={cn(
+              'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
+              autoDj ? 'translate-x-5' : 'translate-x-0.5',
+            )}
+          />
+        </button>
       </div>
     </div>
   )

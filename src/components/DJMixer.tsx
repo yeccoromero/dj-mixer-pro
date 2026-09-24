@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Deck } from './Deck'
+import { Deck, type DeckHandle } from './Deck'
 import { CrossFader } from './CrossFader'
 import { CoverFlow } from './CoverFlow'
 import { EffectsPanel } from './EffectsPanel'
@@ -58,6 +58,14 @@ const SAMPLE_TRACKS: Track[] = [
 ]
 
 const STORAGE_KEY = 'dj-mixer-tracks'
+// When the deck that's playing has this many seconds or fewer left, Auto DJ starts bringing
+// in the other deck — and the crossfade itself takes exactly this long too, so it finishes
+// right as the outgoing track ends instead of overshooting into silence or cutting it short.
+const AUTO_DJ_TRIGGER_SECONDS = 8
+// How often the crossfade advances a step. A plain interval instead of a GSAP tween: nothing
+// here needs GSAP's easing or its own ticker, and a fixed-interval step is far more
+// predictable to test than an animation tied to requestAnimationFrame timing.
+const AUTO_DJ_STEP_MS = 100
 
 const createInitialDeckState = (track: Track | null): DeckState => ({
   isPlaying: false,
@@ -103,6 +111,76 @@ export const DJMixer: React.FC = () => {
     setDeckA((prev) => (prev.volume === volumeA ? prev : { ...prev, volume: volumeA }))
     setDeckB((prev) => (prev.volume === volumeB ? prev : { ...prev, volume: volumeB }))
   }, [crossFaderValue])
+
+  // Auto DJ: watches whichever deck is playing, and hands off to the other one automatically
+  // when it's about to end — it does NOT pick or queue tracks on its own (that would need a
+  // playlist/queue concept this app doesn't have); it only automates the crossfade handoff
+  // between whatever the two decks already have loaded.
+  const [autoDj, setAutoDj] = useState(false)
+  const [autoDjTransitioning, setAutoDjTransitioning] = useState(false)
+  const autoDjTransitioningRef = useRef(false)
+  const autoDjIntervalRef = useRef<number | null>(null)
+  const deckARef = useRef<DeckHandle>(null)
+  const deckBRef = useRef<DeckHandle>(null)
+
+  const stopAutoDjTransition = () => {
+    if (autoDjIntervalRef.current !== null) {
+      window.clearInterval(autoDjIntervalRef.current)
+      autoDjIntervalRef.current = null
+    }
+    autoDjTransitioningRef.current = false
+    setAutoDjTransitioning(false)
+  }
+
+  const startAutoDjTransition = (target: 'A' | 'B', fromValue: number) => {
+    if (autoDjTransitioningRef.current) return
+    const targetState = target === 'A' ? deckA : deckB
+    if (!targetState.track) return
+
+    // Bring the incoming deck in the way a DJ would cue it up, but only if it isn't already
+    // running — if the other deck is already playing (started by hand, mid-track), respect
+    // that instead of yanking it back to its cue point.
+    if (!targetState.isPlaying) {
+      ;(target === 'A' ? deckARef : deckBRef).current?.cueAndPlay()
+    }
+
+    autoDjTransitioningRef.current = true
+    setAutoDjTransitioning(true)
+    const endValue = target === 'A' ? 0 : 100
+    const totalSteps = Math.max(1, Math.round((AUTO_DJ_TRIGGER_SECONDS * 1000) / AUTO_DJ_STEP_MS))
+    let step = 0
+    autoDjIntervalRef.current = window.setInterval(() => {
+      step += 1
+      const t = Math.min(1, step / totalSteps)
+      setCrossFaderValue(Math.round(fromValue + (endValue - fromValue) * t))
+      if (t >= 1) stopAutoDjTransition()
+    }, AUTO_DJ_STEP_MS)
+  }
+
+  // Checked on every playhead update from either deck (the same 200ms poll that already
+  // drives the LED counters and position bar) — cheap, and it's the only reliable signal for
+  // "about to end" without duplicating Deck's own polling.
+  useEffect(() => {
+    if (!autoDj || autoDjTransitioningRef.current) return
+
+    const remaining = (deck: DeckState) => (deck.track ? deck.track.duration - deck.currentTime : Infinity)
+
+    if (deckA.isPlaying && deckB.track && remaining(deckA) <= AUTO_DJ_TRIGGER_SECONDS && remaining(deckA) >= 0) {
+      startAutoDjTransition('B', crossFaderValue)
+    } else if (deckB.isPlaying && deckA.track && remaining(deckB) <= AUTO_DJ_TRIGGER_SECONDS && remaining(deckB) >= 0) {
+      startAutoDjTransition('A', crossFaderValue)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deckA.currentTime, deckA.isPlaying, deckA.track, deckB.currentTime, deckB.isPlaying, deckB.track, autoDj])
+
+  // Turning Auto DJ off mid-crossfade cedes control back immediately instead of letting the
+  // transition play out on its own — same as a manual grab of the fader, below.
+  useEffect(() => {
+    if (!autoDj) stopAutoDjTransition()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoDj])
+
+  useEffect(() => stopAutoDjTransition, [])
 
   const handleTrackSelect = (track: Track) => {
     setSelectedTrack(track)
@@ -194,6 +272,7 @@ export const DJMixer: React.FC = () => {
           {/* Deck A */}
           <div className="space-y-4">
             <Deck
+              ref={deckARef}
               id="A"
               state={deckA}
               onStateChange={setDeckA}
@@ -206,7 +285,15 @@ export const DJMixer: React.FC = () => {
 
           {/* Centro: Cross-fader y CoverFlow */}
           <div className="space-y-6">
-            <CrossFader value={crossFaderValue} onChange={setCrossFaderValue} />
+            <CrossFader
+              value={crossFaderValue}
+              onChange={setCrossFaderValue}
+              instant={autoDjTransitioning}
+              onDragStart={stopAutoDjTransition}
+              autoDj={autoDj}
+              onAutoDjChange={setAutoDj}
+              autoDjTransitioning={autoDjTransitioning}
+            />
 
             <CoverFlow
               tracks={tracks}
@@ -221,6 +308,7 @@ export const DJMixer: React.FC = () => {
           {/* Deck B */}
           <div className="space-y-4">
             <Deck
+              ref={deckBRef}
               id="B"
               state={deckB}
               onStateChange={setDeckB}

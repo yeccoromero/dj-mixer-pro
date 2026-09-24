@@ -347,6 +347,7 @@ biblioteca y buscar otra versión/fuente.
 | **Clic en cualquier parte de la barra** | Salta el fader directamente a esa posición | `DJMixer.crossFaderValue` |
 | **Arrastrar el handle** | Se desliza manualmente; si se suelta con velocidad (un "flick"), sigue deslizando por inercia y frena solo, en vez de detenerse en seco | `DJMixer.crossFaderValue` |
 | **Botón "Centrar"** | Anima la posición de vuelta a 50 (mitad) | `DJMixer.crossFaderValue` |
+| **Interruptor "Auto DJ"** | Activa/desactiva el cruce automático hacia el otro deck cuando la pista que suena está por terminar (ver sección propia abajo) | `DJMixer.autoDj` |
 
 **Físicas reales (GSAP):** el handle es un `Draggable` de GSAP (`type: "x"`, acotado a la barra) con
 `InertiaPlugin`, igual mecanismo que los knobs — por eso ambos controles se sienten consistentes
@@ -362,6 +363,49 @@ de forma lineal (50/50 en el centro); usa un barrido de un cuarto de coseno/seno
 centro ambos decks quedan cerca de 71/71 en vez de 50/50. Es el mismo motivo por el que los mixers
 de DJ reales usan esta curva: una mezcla lineal suena perceptiblemente más floja justo a mitad de
 camino, porque la potencia percibida no es la suma lineal de los dos volúmenes.
+
+### Auto DJ (`DJMixer.tsx`)
+
+Pedido explícito: "cuando una pieza esté por acabarse de reproducir, que pase el deck de forma
+automática al otro, como un Auto DJ". **Alcance deliberado:** Auto DJ solo automatiza el *cruce*
+entre lo que ya está cargado en los dos decks — no elige ni encola pistas nuevas de la biblioteca
+por su cuenta (eso necesitaría un concepto de cola/playlist que esta app no tiene). Si el deck que
+no está sonando no tiene ninguna pista asignada, Auto DJ simplemente no hace nada cuando llega el
+momento — la pista que suena termina sola, como si Auto DJ estuviera apagado.
+
+**Cómo se dispara:** cada vez que cualquiera de los dos decks reporta su posición (el mismo poll de
+200ms que ya alimenta los contadores LED y la barra), `DJMixer` revisa si el deck que está sonando
+le quedan `AUTO_DJ_TRIGGER_SECONDS` (8s) o menos — si es así, y el otro deck tiene una pista
+asignada, arranca la transición.
+
+**Qué hace la transición, paso a paso:**
+1. Si el deck entrante **no** está sonando, lo arranca como lo haría un DJ: salta a su punto de cue
+   guardado y reproduce desde ahí (`Deck.cueAndPlay()`, un método imperativo nuevo expuesto vía
+   `forwardRef`/`useImperativeHandle` — el resto de la app se maneja por props/estado, pero "arrancá
+   esta pista ya" es un comando puntual, no algo que tenga sentido guardar como campo de estado).
+   Si el deck entrante **ya** está sonando (el usuario lo arrancó a mano), no lo toca — respeta
+   que ya esté en marcha en vez de reiniciarlo desde el cue.
+2. El crossfader se anima solo desde su posición actual hasta el extremo del deck entrante, en los
+   mismos `AUTO_DJ_TRIGGER_SECONDS` — un `setInterval` de pasos cada 100ms (no un tween de GSAP:
+   nada acá necesita el easing o el ticker propio de GSAP, y un paso a intervalo fijo es mucho más
+   predecible de testear que una animación atada a `requestAnimationFrame`). Termina justo cuando
+   la pista saliente llega a su fin, en vez de pasarse o cortarla antes de tiempo.
+3. Al llegar al extremo, la transición se detiene sola. La pista saliente no se pausa a mano — ya
+   está en `currentTime ≈ duration`, así que el propio reproductor de YouTube la termina solo
+   (`onStateChange` → `ENDED`), el mismo mecanismo que ya existía.
+
+**`CrossFader.tsx` necesitó dos props nuevas para no pelearse con esta animación:** `instant`
+(evita que el propio efecto de "sincronizar valor externo" del fader — pensado para saltos puntuales
+como "Centrar", con su propia animación de 0.5s — dispare una animación nueva en cada uno de los ~80
+pasos del cruce, lo que se hubiera visto entrecortado en vez de fluido) y `onDragStart` (si el
+usuario agarra el fader a mano en medio de una transición automática, Auto DJ cede el control al
+instante en vez de pelear contra el arrastre — mismo criterio que "girar la rueda de scratch corta
+lo que estuviera pasando", aplicado acá al fader).
+
+**Se puede interrumpir en cualquier momento:** apagar el interruptor "Auto DJ" a mitad de una
+transición la corta ahí mismo (el fader se queda donde estaba, no salta a ningún lado) — igual que
+agarrar el fader a mano. Ninguna de las dos formas de interrumpir espera a que la transición
+"termine prolijo"; ceder el control es inmediato.
 
 ---
 

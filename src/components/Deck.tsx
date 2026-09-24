@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Play, Pause, Disc3, AlertTriangle, RotateCcw, Repeat } from 'lucide-react'
 import type { DeckState } from './DJMixer'
@@ -24,6 +24,16 @@ interface DeckProps {
   ducking?: boolean
 }
 
+/** Imperative controls exposed to DJMixer for Auto DJ — everything else about a deck stays
+ * driven by props/state, but "start this deck the way a DJ would cue the next track" doesn't
+ * fit as a state field (it's a one-off command, not something to remember or re-render on). */
+export interface DeckHandle {
+  /** Seeks to the saved cue point and starts playback — used by Auto DJ to bring in the
+   * incoming deck the same way the CUE button's hold-preview does, just without a finger on
+   * it. No-op if the player isn't ready or has no track (mirrors every other control here). */
+  cueAndPlay: () => void
+}
+
 const accent = { A: 'lime', B: 'aqua' } as const
 // How long the Cue button has to be held before it switches from a "jump back" tap into a
 // "preview from here" hold — long enough that a normal tap never crosses it, short enough
@@ -42,7 +52,10 @@ const DUCK_FACTOR = 0.3
 // waiting for a real out point.
 const MIN_LOOP_PERCENT = 1
 
-export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, onActivate, onDurationResolved, ducking = false }) => {
+export const Deck = forwardRef<DeckHandle, DeckProps>(function Deck(
+  { id, state, onStateChange, isActive, onActivate, onDurationResolved, ducking = false },
+  ref,
+) {
   const containerId = `yt-player-${id}`
   const playerRef = useRef<YouTubePlayer | null>(null)
   const [ready, setReady] = useState(false)
@@ -231,6 +244,14 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
     jumpToCue()
     playerRef.current?.pauseVideo()
   }
+
+  useImperativeHandle(ref, () => ({
+    cueAndPlay: () => {
+      if (!playerRef.current || !readyRef.current || !stateRef.current.track) return
+      jumpToCue()
+      playerRef.current.playVideo()
+    },
+  }))
 
   // A quick tap on Cue jumps to the marked point without touching playback state — if it
   // was playing, it keeps playing from there; if it was paused, it stays paused there.
@@ -469,4 +490,4 @@ export const Deck: React.FC<DeckProps> = ({ id, state, onStateChange, isActive, 
       </div>
     </motion.div>
   )
-}
+})

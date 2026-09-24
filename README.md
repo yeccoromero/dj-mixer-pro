@@ -6,6 +6,7 @@ Un DJ mixer profesional en el navegador construido con React, TypeScript, Tailwi
 
 - **Dos decks (A y B)** con reproducción de YouTube vía la YouTube IFrame API
 - **Crossfader con físicas reales** (GSAP Draggable + inercia) y curva de potencia constante (equal-power), como en un mixer real: clic para saltar, arrastre, y "flick" que desliza y frena solo
+- **Auto DJ**: cuando la pista que suena está por terminar (8s o menos), cruza sola al otro deck si tiene una pista cargada — arranca esa pista desde su cue si no estaba sonando, anima el crossfader hasta el otro extremo, y se puede interrumpir en cualquier momento agarrando el fader a mano o apagando el interruptor
 - **Fader vertical de Gain** que se desliza de verdad con inercia (GSAP), clic-para-saltar, o por teclado, con tooltip explicando su función
 - **Reproductor limpio**: sin controles ni interfaz propia de YouTube encima del video, sin captions por defecto; play/pause/cue solo desde la consola de la app
 - **Cue al estilo CDJ**: barra de posición tocable/arrastrable (como el buscador de YouTube) para buscar el momento, botón MARCAR para guardarlo ahí mismo (con un botón de reset para volver a 0), y CUE con toque corto (salta sin cortar la reproducción, útil para loops manuales) o mantener presionado (vista previa, vuelve y pausa al soltar)
