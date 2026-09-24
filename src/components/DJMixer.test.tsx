@@ -83,19 +83,19 @@ describe('DJMixer — Auto DJ', () => {
     vi.useRealTimers()
   })
 
-  it('does nothing while Auto DJ is off, even with 8s or less left on the playing deck', () => {
+  it('does nothing while Auto DJ is off, even with 5s or less left on the playing deck', () => {
     render(<DJMixer />)
-    setDeckState('A', { isPlaying: true, currentTime: 195 }) // 5s left of 200s
+    setDeckState('A', { isPlaying: true, currentTime: 196 }) // 4s left of 200s
     act(() => vi.advanceTimersByTime(500))
 
     expect(cueAndPlaySpies.B).not.toHaveBeenCalled()
     expect(capturedCrossFaderProps?.value).toBe(50)
   })
 
-  it('starts the other deck and begins crossfading once the playing deck has 8s or less left', () => {
+  it('starts the other deck and begins crossfading once the playing deck has 5s or less left', () => {
     render(<DJMixer />)
     enableAutoDj()
-    setDeckState('A', { isPlaying: true, currentTime: 193 }) // exactly 7s left
+    setDeckState('A', { isPlaying: true, currentTime: 196 }) // exactly 4s left
 
     act(() => vi.advanceTimersByTime(0)) // let the effect from the state update run
     expect(cueAndPlaySpies.B).toHaveBeenCalledTimes(1)
@@ -106,7 +106,7 @@ describe('DJMixer — Auto DJ', () => {
     render(<DJMixer />)
     enableAutoDj()
     setDeckState('B', { isPlaying: true, currentTime: 10 })
-    setDeckState('A', { isPlaying: true, currentTime: 193 })
+    setDeckState('A', { isPlaying: true, currentTime: 196 })
 
     expect(cueAndPlaySpies.B).not.toHaveBeenCalled()
   })
@@ -116,7 +116,7 @@ describe('DJMixer — Auto DJ', () => {
     enableAutoDj()
     // Clear deck B's track by driving it through onStateChange directly.
     setDeckState('B', { track: null })
-    setDeckState('A', { isPlaying: true, currentTime: 193 })
+    setDeckState('A', { isPlaying: true, currentTime: 196 })
 
     expect(cueAndPlaySpies.B).not.toHaveBeenCalled()
     expect(capturedCrossFaderProps?.autoDjTransitioning).toBeFalsy()
@@ -125,9 +125,9 @@ describe('DJMixer — Auto DJ', () => {
   it('the crossfade reaches full B and stops on its own once the transition window elapses', () => {
     render(<DJMixer />)
     enableAutoDj()
-    setDeckState('A', { isPlaying: true, currentTime: 192 }) // 8s left, starts at value=50
+    setDeckState('A', { isPlaying: true, currentTime: 196 }) // 4s left, starts at value=50
 
-    act(() => vi.advanceTimersByTime(8000))
+    act(() => vi.advanceTimersByTime(2000)) // AUTO_DJ_TRANSITION_SECONDS
 
     expect(capturedCrossFaderProps?.value).toBe(100)
     expect(capturedCrossFaderProps?.autoDjTransitioning).toBe(false)
@@ -136,15 +136,15 @@ describe('DJMixer — Auto DJ', () => {
   it('grabbing the fader mid-transition cedes control back — the value stops advancing on its own', () => {
     render(<DJMixer />)
     enableAutoDj()
-    setDeckState('A', { isPlaying: true, currentTime: 192 })
+    setDeckState('A', { isPlaying: true, currentTime: 196 })
 
-    act(() => vi.advanceTimersByTime(3000)) // partway through the 8s transition
+    act(() => vi.advanceTimersByTime(1000)) // partway through the 2s transition
     const valueMidway = capturedCrossFaderProps?.value
     expect(valueMidway).toBeGreaterThan(50)
     expect(valueMidway).toBeLessThan(100)
 
     fireEvent.click(screen.getByText('drag-start'))
-    act(() => vi.advanceTimersByTime(3000)) // the rest of what would've been the transition
+    act(() => vi.advanceTimersByTime(2000)) // the rest of what would've been the transition
 
     expect(capturedCrossFaderProps?.value).toBe(valueMidway)
     expect(capturedCrossFaderProps?.autoDjTransitioning).toBe(false)
@@ -153,13 +153,13 @@ describe('DJMixer — Auto DJ', () => {
   it('turning Auto DJ off mid-transition also stops it in place', () => {
     render(<DJMixer />)
     enableAutoDj()
-    setDeckState('A', { isPlaying: true, currentTime: 192 })
+    setDeckState('A', { isPlaying: true, currentTime: 196 })
 
-    act(() => vi.advanceTimersByTime(3000))
+    act(() => vi.advanceTimersByTime(1000))
     const valueMidway = capturedCrossFaderProps?.value
 
     fireEvent.click(screen.getByText('toggle-autodj')) // turn Auto DJ off
-    act(() => vi.advanceTimersByTime(5000))
+    act(() => vi.advanceTimersByTime(2000))
 
     expect(capturedCrossFaderProps?.value).toBe(valueMidway)
   })

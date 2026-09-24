@@ -374,8 +374,8 @@ no está sonando no tiene ninguna pista asignada, Auto DJ simplemente no hace na
 momento — la pista que suena termina sola, como si Auto DJ estuviera apagado.
 
 **Cómo se dispara:** cada vez que cualquiera de los dos decks reporta su posición (el mismo poll de
-200ms que ya alimenta los contadores LED y la barra), `DJMixer` revisa si el deck que está sonando
-le quedan `AUTO_DJ_TRIGGER_SECONDS` (8s) o menos — si es así, y el otro deck tiene una pista
+200ms que ya alimenta los contadores LED y la barra), `DJMixer` revisa si al deck que está sonando
+le quedan `AUTO_DJ_TRIGGER_SECONDS` (5s) o menos — si es así, y el otro deck tiene una pista
 asignada, arranca la transición.
 
 **Qué hace la transición, paso a paso:**
@@ -385,27 +385,41 @@ asignada, arranca la transición.
    esta pista ya" es un comando puntual, no algo que tenga sentido guardar como campo de estado).
    Si el deck entrante **ya** está sonando (el usuario lo arrancó a mano), no lo toca — respeta
    que ya esté en marcha en vez de reiniciarlo desde el cue.
-2. El crossfader se anima solo desde su posición actual hasta el extremo del deck entrante, en los
-   mismos `AUTO_DJ_TRIGGER_SECONDS` — un `setInterval` de pasos cada 100ms (no un tween de GSAP:
-   nada acá necesita el easing o el ticker propio de GSAP, y un paso a intervalo fijo es mucho más
-   predecible de testear que una animación atada a `requestAnimationFrame`). Termina justo cuando
-   la pista saliente llega a su fin, en vez de pasarse o cortarla antes de tiempo.
-3. Al llegar al extremo, la transición se detiene sola. La pista saliente no se pausa a mano — ya
-   está en `currentTime ≈ duration`, así que el propio reproductor de YouTube la termina solo
-   (`onStateChange` → `ENDED`), el mismo mecanismo que ya existía.
+2. El crossfader se anima solo desde su posición actual hasta el extremo del deck entrante, en
+   `AUTO_DJ_TRANSITION_SECONDS` (2s) — un `setInterval` de pasos cada `AUTO_DJ_STEP_MS` (50ms, ~40
+   pasos en total; no un tween de GSAP: nada acá necesita el easing o el ticker propio de GSAP, y un
+   paso a intervalo fijo es mucho más predecible de testear que una animación atada a
+   `requestAnimationFrame`). El umbral de disparo (5s) queda un poco más largo que la transición en
+   sí (2s) a propósito, para que el cruce termine con la pista saliente todavía sonando cómoda, no
+   justo en su último cuadro.
+
+   **Ajuste — la primera versión (8s de disparo y de transición, un solo valor para ambos) se
+   sentía lenta:** pedido explícito ("la animación del deck es muy lenta, debe ser más rápida
+   eficiente"). Se separaron en dos constantes independientes — el umbral de disparo puede seguir
+   siendo generoso sin que la animación en sí se sienta arrastrada.
+3. Al llegar al extremo, la transición se detiene sola. La pista saliente no se pausa a mano — para
+   entonces ya está cerca de `currentTime ≈ duration`, así que el propio reproductor de YouTube la
+   termina solo (`onStateChange` → `ENDED`), el mismo mecanismo que ya existía.
 
 **`CrossFader.tsx` necesitó dos props nuevas para no pelearse con esta animación:** `instant`
 (evita que el propio efecto de "sincronizar valor externo" del fader — pensado para saltos puntuales
-como "Centrar", con su propia animación de 0.5s — dispare una animación nueva en cada uno de los ~80
+como "Centrar", con su propia animación de 0.5s — dispare una animación nueva en cada uno de los
 pasos del cruce, lo que se hubiera visto entrecortado en vez de fluido) y `onDragStart` (si el
 usuario agarra el fader a mano en medio de una transición automática, Auto DJ cede el control al
-instante en vez de pelear contra el arrastre — mismo criterio que "girar la rueda de scratch corta
-lo que estuviera pasando", aplicado acá al fader).
+instante en vez de pelear contra el arrastre).
 
 **Se puede interrumpir en cualquier momento:** apagar el interruptor "Auto DJ" a mitad de una
 transición la corta ahí mismo (el fader se queda donde estaba, no salta a ningún lado) — igual que
 agarrar el fader a mano. Ninguna de las dos formas de interrumpir espera a que la transición
 "termine prolijo"; ceder el control es inmediato.
+
+**Bug corregido — la perilla del interruptor se salía de la píldora:** reporte real del usuario
+viendo el interruptor activo en producción. La perilla (`<span>` circular, posicionado
+`absolute`) solo tenía `top-0.5` fijado, sin `left` — un elemento `absolute` sin `left` explícito
+depende de su "posición estática" (dónde habría quedado si fuera `static`), que no es confiable
+entre navegadores/layouts para este caso. Se agregó `left-0.5` explícito como posición base (y
+`translate-x-0`/`translate-x-5` para los dos estados, en vez de `translate-x-0.5`/`translate-x-5`),
+así la perilla queda simétrica dentro de la píldora en los dos estados.
 
 ---
 

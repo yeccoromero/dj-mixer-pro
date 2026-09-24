@@ -59,13 +59,17 @@ const SAMPLE_TRACKS: Track[] = [
 
 const STORAGE_KEY = 'dj-mixer-tracks'
 // When the deck that's playing has this many seconds or fewer left, Auto DJ starts bringing
-// in the other deck — and the crossfade itself takes exactly this long too, so it finishes
-// right as the outgoing track ends instead of overshooting into silence or cutting it short.
-const AUTO_DJ_TRIGGER_SECONDS = 8
+// in the other deck. Kept a bit longer than the crossfade itself takes (below) so the handoff
+// finishes with the outgoing track still comfortably playing, not right at its last frame.
+const AUTO_DJ_TRIGGER_SECONDS = 5
+// How long the crossfade itself takes once triggered. Snappy on purpose — an 8s linear fade
+// (the original value) read as sluggish; real quick DJ transitions are a couple of seconds,
+// and the equal-power crossfader curve already keeps the blend from dipping in volume.
+const AUTO_DJ_TRANSITION_SECONDS = 2
 // How often the crossfade advances a step. A plain interval instead of a GSAP tween: nothing
 // here needs GSAP's easing or its own ticker, and a fixed-interval step is far more
 // predictable to test than an animation tied to requestAnimationFrame timing.
-const AUTO_DJ_STEP_MS = 100
+const AUTO_DJ_STEP_MS = 50
 
 const createInitialDeckState = (track: Track | null): DeckState => ({
   isPlaying: false,
@@ -147,7 +151,7 @@ export const DJMixer: React.FC = () => {
     autoDjTransitioningRef.current = true
     setAutoDjTransitioning(true)
     const endValue = target === 'A' ? 0 : 100
-    const totalSteps = Math.max(1, Math.round((AUTO_DJ_TRIGGER_SECONDS * 1000) / AUTO_DJ_STEP_MS))
+    const totalSteps = Math.max(1, Math.round((AUTO_DJ_TRANSITION_SECONDS * 1000) / AUTO_DJ_STEP_MS))
     let step = 0
     autoDjIntervalRef.current = window.setInterval(() => {
       step += 1
