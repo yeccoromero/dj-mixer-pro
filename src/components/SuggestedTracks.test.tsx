@@ -72,7 +72,7 @@ describe('SuggestedTracks', () => {
     await flushMicrotasks()
 
     expect(resolveSuggestionQuery).toHaveBeenCalledWith('aaaaaaaaaaa', 'Some Artist')
-    expect(searchSuggestedVideos).toHaveBeenCalledWith('Some Artist', [])
+    expect(searchSuggestedVideos).toHaveBeenCalledWith('Some Artist', [], 'Some Artist')
     expect(screen.getByText('A Remix')).toBeInTheDocument()
     expect(screen.getByText('Sugeridos')).toBeInTheDocument()
   })
@@ -87,7 +87,7 @@ describe('SuggestedTracks', () => {
     })
     await flushMicrotasks()
 
-    expect(searchSuggestedVideos).toHaveBeenCalledWith('house deep house electronic', [])
+    expect(searchSuggestedVideos).toHaveBeenCalledWith('house deep house electronic', [], 'Some Artist')
   })
 
   it('renders nothing once the search resolves with no results', async () => {

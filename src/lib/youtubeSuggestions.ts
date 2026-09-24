@@ -6,7 +6,10 @@ export interface SuggestedVideo {
 }
 
 const SEARCH_TIMEOUT_MS = 8000
-const MAX_RESULTS = 8
+// Fetched generously because `excludeArtist` below discards some of these — a channel that
+// tags its own catalog consistently often ranks its own other uploads highly for a tag-based
+// query too, so asking for exactly 8 up front would frequently leave too few once filtered.
+const MAX_RESULTS = 15
 const MAX_TAGS_IN_QUERY = 3
 
 // Searching the same artist twice in one session (e.g. browsing back and forth in the
@@ -64,19 +67,37 @@ export async function resolveSuggestionQuery(youtubeId: string, fallbackArtist: 
 }
 
 /**
- * Searches YouTube for videos related to `query` (in practice, the active library track's
- * artist — "more like this artist" is a more honest "goes with this song" signal than a
- * generic text search, and cheaper to reason about). Needs `VITE_YOUTUBE_API_KEY` — with no
- * key configured, or on any failure (quota exceeded, network, invalid key), this resolves to
- * an empty array rather than throwing, so the suggestions panel can just render nothing
- * instead of surfacing an error for what's a non-essential feature.
+ * Searches YouTube for videos related to `query` (in practice, a tag-based query from
+ * `resolveSuggestionQuery`, falling back to the active track's artist). Needs
+ * `VITE_YOUTUBE_API_KEY` — with no key configured, or on any failure (quota exceeded, network,
+ * invalid key), this resolves to an empty array rather than throwing, so the suggestions panel
+ * can just render nothing instead of surfacing an error for what's a non-essential feature.
+ *
+ * `excludeArtist`, when given, drops any result whose channel matches it (case-insensitive).
+ * `search.list` is plain text relevance ranking, not YouTube's own (unpublished) personalized
+ * "related videos" algorithm — a tag-based query alone still surfaces plenty of the same
+ * artist's other uploads, since a channel usually tags its whole catalog the same way. This is
+ * the actual guardrail against "just more from this channel"; the tag-based query only helps
+ * the *quality* of what's left after this filter, not by itself.
  */
-export async function searchSuggestedVideos(query: string, excludeIds: readonly string[] = []): Promise<SuggestedVideo[]> {
+export async function searchSuggestedVideos(
+  query: string,
+  excludeIds: readonly string[] = [],
+  excludeArtist?: string,
+): Promise<SuggestedVideo[]> {
   const trimmed = query.trim()
   if (!trimmed) return []
 
+  const excludeArtistLower = excludeArtist?.trim().toLowerCase()
+  const applyFilters = (results: SuggestedVideo[]) =>
+    results.filter((video) => {
+      if (excludeIds.includes(video.youtubeId)) return false
+      if (excludeArtistLower && video.channelTitle.trim().toLowerCase() === excludeArtistLower) return false
+      return true
+    })
+
   const cached = cache.get(trimmed)
-  if (cached) return cached.filter((video) => !excludeIds.includes(video.youtubeId))
+  if (cached) return applyFilters(cached)
 
   const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY as string | undefined
   if (!apiKey) return []
@@ -123,7 +144,7 @@ export async function searchSuggestedVideos(query: string, excludeIds: readonly 
       .filter((video): video is SuggestedVideo => video !== null)
 
     cache.set(trimmed, results)
-    return results.filter((video) => !excludeIds.includes(video.youtubeId))
+    return applyFilters(results)
   } catch {
     return []
   } finally {

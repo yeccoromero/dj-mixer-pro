@@ -80,6 +80,27 @@ describe('searchSuggestedVideos', () => {
     expect(await searchSuggestedVideos('Some Artist 2', ['abc12345678'])).toEqual([])
   })
 
+  it('excludes results whose channel matches excludeArtist, case-insensitively', async () => {
+    const otherArtistItem = {
+      id: { videoId: 'other000001' },
+      snippet: { title: 'Other Track', channelTitle: 'A Different Act', thumbnails: {} },
+    }
+    mockSearchResponse([sampleItem, otherArtistItem])
+
+    const results = await searchSuggestedVideos('house music', [], 'some artist')
+
+    expect(results).toEqual([expect.objectContaining({ youtubeId: 'other000001' })])
+  })
+
+  it('excludeArtist is applied to cached results too, not just the first fetch', async () => {
+    mockSearchResponse([sampleItem])
+
+    await searchSuggestedVideos('cached with exclude')
+    const second = await searchSuggestedVideos('cached with exclude', [], 'Some Artist')
+
+    expect(second).toEqual([])
+  })
+
   it('returns an empty array on a non-OK response instead of throwing', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: false }) as unknown as typeof fetch
     expect(await searchSuggestedVideos('quota exceeded query')).toEqual([])

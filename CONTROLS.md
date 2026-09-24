@@ -493,6 +493,20 @@ como "Sugeridos" a secas.
 (de ~100 a ~101 unidades), así que el límite práctico sigue siendo las ~100 búsquedas/día del free
 tier, no esta llamada adicional.
 
+**El tag-based query solo no bastaba — se agregó un filtro explícito por canal:** reporte real del
+usuario probando en producción: "sigue sugiriendo del mismo artista, no como lo hace YouTube". La
+causa: `search.list` es una búsqueda de texto por relevancia, no el algoritmo propio (no público)
+que usa YouTube.com para "videos relacionados" — ese endpoint (`relatedToVideoId`) fue discontinuado
+por YouTube hace años y no tiene reemplazo en la API pública. Como un canal suele tagear todo su
+catálogo de forma parecida, una consulta por tags igual devuelve bastante del mismo canal en el
+ranking de relevancia. Se agregó entonces un filtro explícito: `searchSuggestedVideos` ahora acepta
+un tercer parámetro `excludeArtist` y descarta cualquier resultado cuyo `channelTitle` coincida
+(sin importar mayúsculas) con el artista de la pista activa — este es el guardarraíl real contra
+"más de este canal"; la consulta por tags solo mejora la *calidad* de lo que queda después de este
+filtro, no lo reemplaza. Para compensar lo que se descarta, `MAX_RESULTS` subió de 8 a 15 (se sigue
+pidiendo una sola página de resultados, mismo costo de cuota — la API ya devuelve hasta 15 videos en
+esa misma llamada).
+
 **Requiere una API key propia (`VITE_YOUTUBE_API_KEY`):** a diferencia del autocompletado del modal
 de agregar (que usa el endpoint público `oEmbed`, sin key), tanto `videos.list` como `search.list`
 de la YouTube Data API v3 solo funcionan con una API key. Como esta app no tiene backend, la key

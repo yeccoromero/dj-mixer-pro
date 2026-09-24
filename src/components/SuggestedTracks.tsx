@@ -36,7 +36,7 @@ export const SuggestedTracks: React.FC<SuggestedTracksProps> = ({ basedOn, exist
     setLoading(true)
     const timer = window.setTimeout(() => {
       void resolveSuggestionQuery(basedOn.youtubeId, basedOn.artist)
-        .then((query) => searchSuggestedVideos(query, existingTrackIds))
+        .then((query) => searchSuggestedVideos(query, existingTrackIds, basedOn.artist))
         .then((results) => {
           setSuggestions(results)
           setLoading(false)
