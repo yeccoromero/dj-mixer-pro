@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react'
 import { Loader2, Plus } from 'lucide-react'
 import type { Track } from './DJMixer'
-import { searchSuggestedVideos, type SuggestedVideo } from '@/lib/youtubeSuggestions'
+import { resolveSuggestionQuery, searchSuggestedVideos, type SuggestedVideo } from '@/lib/youtubeSuggestions'
 import { checkVideoEmbeddable } from '@/lib/youtubeEmbedCheck'
 
 interface SuggestedTracksProps {
   /** The library track suggestions are based on — in practice, whichever card is centered
-   * in the CoverFlow carousel. Its artist is the search query: "more from this artist" is a
-   * more honest "goes with this song" signal than a generic keyword search, and it doubles
-   * as a natural rate limiter (browsing settles on one artist rather than firing a distinct
-   * query per keystroke). */
+   * in the CoverFlow carousel. `resolveSuggestionQuery` prefers the track's own YouTube tags
+   * (genre/style keywords) over its artist — "goes with this song" should surface other
+   * artists in the same style, not just more uploads from the same channel — and only falls
+   * back to searching by artist when the video has no tags set. Debouncing this also doubles
+   * as a natural rate limiter (browsing settles on one track instead of firing a query per
+   * card passed through). */
   basedOn: Track | null
   existingTrackIds: readonly string[]
   onAddTrack: (track: Track) => void
@@ -33,17 +35,19 @@ export const SuggestedTracks: React.FC<SuggestedTracksProps> = ({ basedOn, exist
     }
     setLoading(true)
     const timer = window.setTimeout(() => {
-      void searchSuggestedVideos(basedOn.artist, existingTrackIds).then((results) => {
-        setSuggestions(results)
-        setLoading(false)
-      })
+      void resolveSuggestionQuery(basedOn.youtubeId, basedOn.artist)
+        .then((query) => searchSuggestedVideos(query, existingTrackIds))
+        .then((results) => {
+          setSuggestions(results)
+          setLoading(false)
+        })
     }, SEARCH_DEBOUNCE_MS)
     return () => window.clearTimeout(timer)
     // existingTrackIds intentionally excluded: it changes on every add/remove anywhere in the
     // library, and re-searching for that alone would waste quota — the already-fetched list is
     // filtered against it directly below instead, which is enough to hide a track once added.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [basedOn?.artist])
+  }, [basedOn?.artist, basedOn?.youtubeId])
 
   // With no API key configured, or nothing found, or the search still resolving before ever
   // returning anything — there's nothing worth taking up space for in either case.
@@ -68,7 +72,7 @@ export const SuggestedTracks: React.FC<SuggestedTracksProps> = ({ basedOn, exist
 
   return (
     <div className="flex flex-col gap-2 border-t border-border pt-3">
-      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Sugeridos de {basedOn.artist}</span>
+      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Sugeridos</span>
       <div className="flex gap-2 overflow-x-auto pb-1">
         {loading && visible.length === 0 && (
           <div className="flex h-16 w-full items-center justify-center">

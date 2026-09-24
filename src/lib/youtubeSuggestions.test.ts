@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { searchSuggestedVideos } from './youtubeSuggestions'
+import { fetchVideoTags, resolveSuggestionQuery, searchSuggestedVideos } from './youtubeSuggestions'
 
 const originalFetch = globalThis.fetch
 
@@ -98,5 +98,79 @@ describe('searchSuggestedVideos', () => {
     await searchSuggestedVideos('cached artist')
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('fetchVideoTags', () => {
+  it('returns an empty array with no API key configured, without calling fetch', async () => {
+    vi.stubEnv('VITE_YOUTUBE_API_KEY', '')
+    const fetchMock = vi.fn()
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    expect(await fetchVideoTags('vid-no-key')).toEqual([])
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("returns the video's tags from a successful response", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [{ snippet: { tags: ['house', 'deep house', 'electronic', 'a fifth tag'] } }] }),
+    }) as unknown as typeof fetch
+
+    expect(await fetchVideoTags('vid-with-tags')).toEqual(['house', 'deep house', 'electronic', 'a fifth tag'])
+  })
+
+  it('returns an empty array when the video has no tags set', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [{ snippet: {} }] }),
+    }) as unknown as typeof fetch
+
+    expect(await fetchVideoTags('vid-no-tags')).toEqual([])
+  })
+
+  it('returns an empty array on a non-OK response instead of throwing', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: false }) as unknown as typeof fetch
+    expect(await fetchVideoTags('vid-error')).toEqual([])
+  })
+
+  it('returns an empty array on a network error instead of throwing', async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('network blocked')) as unknown as typeof fetch
+    expect(await fetchVideoTags('vid-network-error')).toEqual([])
+  })
+
+  it('caches tags per video id, so a repeated lookup does not call fetch again', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ items: [{ snippet: { tags: ['tag'] } }] }) })
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    await fetchVideoTags('vid-cached')
+    await fetchVideoTags('vid-cached')
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('resolveSuggestionQuery', () => {
+  it("joins up to the first 3 of the video's tags when it has some", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [{ snippet: { tags: ['house', 'deep house', 'electronic', 'unused fourth tag'] } }] }),
+    }) as unknown as typeof fetch
+
+    expect(await resolveSuggestionQuery('vid-tagged', 'Fallback Artist')).toBe('house deep house electronic')
+  })
+
+  it('falls back to the artist when the video has no tags', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [{ snippet: {} }] }),
+    }) as unknown as typeof fetch
+
+    expect(await resolveSuggestionQuery('vid-untagged', 'Fallback Artist')).toBe('Fallback Artist')
+  })
+
+  it('falls back to the artist when the tags lookup fails', async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('network blocked')) as unknown as typeof fetch
+    expect(await resolveSuggestionQuery('vid-failed', 'Fallback Artist')).toBe('Fallback Artist')
   })
 })

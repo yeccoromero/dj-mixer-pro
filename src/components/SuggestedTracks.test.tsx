@@ -5,12 +5,13 @@ import type { Track } from './DJMixer'
 
 vi.mock('@/lib/youtubeSuggestions', () => ({
   searchSuggestedVideos: vi.fn(),
+  resolveSuggestionQuery: vi.fn(),
 }))
 vi.mock('@/lib/youtubeEmbedCheck', () => ({
   checkVideoEmbeddable: vi.fn(),
 }))
 
-import { searchSuggestedVideos } from '@/lib/youtubeSuggestions'
+import { resolveSuggestionQuery, searchSuggestedVideos } from '@/lib/youtubeSuggestions'
 import { checkVideoEmbeddable } from '@/lib/youtubeEmbedCheck'
 
 const track: Track = {
@@ -32,6 +33,9 @@ const video = {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers()
+  // Falls back to the artist when the video has no tags set — most tests here aren't
+  // exercising the tag-vs-artist choice itself, so this keeps them on the simple path.
+  vi.mocked(resolveSuggestionQuery).mockImplementation((_youtubeId, fallbackArtist) => Promise.resolve(fallbackArtist))
 })
 
 afterEach(() => {
@@ -57,19 +61,33 @@ describe('SuggestedTracks', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('searches by the active track artist, debounced, and renders the results', async () => {
+  it('resolves a query from the active track, debounced, and renders the results', async () => {
     vi.mocked(searchSuggestedVideos).mockResolvedValue([video])
     render(<SuggestedTracks basedOn={track} existingTrackIds={[]} onAddTrack={vi.fn()} />)
 
-    expect(searchSuggestedVideos).not.toHaveBeenCalled() // still debouncing
+    expect(resolveSuggestionQuery).not.toHaveBeenCalled() // still debouncing
     act(() => {
       vi.advanceTimersByTime(500)
     })
     await flushMicrotasks()
 
+    expect(resolveSuggestionQuery).toHaveBeenCalledWith('aaaaaaaaaaa', 'Some Artist')
     expect(searchSuggestedVideos).toHaveBeenCalledWith('Some Artist', [])
     expect(screen.getByText('A Remix')).toBeInTheDocument()
-    expect(screen.getByText('Sugeridos de Some Artist')).toBeInTheDocument()
+    expect(screen.getByText('Sugeridos')).toBeInTheDocument()
+  })
+
+  it('searches by the resolved tag-based query instead of the artist when the video has tags', async () => {
+    vi.mocked(resolveSuggestionQuery).mockResolvedValue('house deep house electronic')
+    vi.mocked(searchSuggestedVideos).mockResolvedValue([video])
+    render(<SuggestedTracks basedOn={track} existingTrackIds={[]} onAddTrack={vi.fn()} />)
+
+    act(() => {
+      vi.advanceTimersByTime(500)
+    })
+    await flushMicrotasks()
+
+    expect(searchSuggestedVideos).toHaveBeenCalledWith('house deep house electronic', [])
   })
 
   it('renders nothing once the search resolves with no results', async () => {

@@ -471,28 +471,43 @@ salir de la app a buscar un link en YouTube.
 |---|---|---|
 | **Botón "+" sobre una miniatura sugerida** | Verifica que el video se pueda reproducir acá (mismo chequeo que el modal de agregar) y, si pasa, lo agrega a la biblioteca | `SuggestedTracks` local (`addingId` mientras verifica) → `DJMixer.tracks` vía `onAddTrack` |
 
-**De dónde salen las sugerencias:** la búsqueda usa como consulta el **artista** de la tarjeta
-que está al frente en el carrusel (`CoverFlow`'s `activeTrack`), no un texto genérico — "más de
-este artista/canal" es una señal más honesta de "pega con esta canción" que una búsqueda por
-palabra clave suelta, y de paso limita cuántas búsquedas dispara solo por hojear la biblioteca
-(cambiar de tarjeta no cambia de artista en cada toque). Al cambiar de artista activo, la búsqueda
-espera 500ms sin otro cambio antes de disparar (debounce) — recorrer varias tarjetas con las
-flechas o el swipe dispara una sola búsqueda al asentarse, no una por tarjeta.
+**De dónde salen las sugerencias — por estilo (tags), no solo por artista:** la primera versión
+buscaba siempre por el **artista** de la tarjeta activa, lo cual devolvía nada más que más uploads
+del mismo canal — poco útil si la biblioteca solo tiene una pista de ese artista. Pedido explícito
+de hacerlo "más inteligente". Ahora, antes de buscar, `resolveSuggestionQuery` (en
+`lib/youtubeSuggestions.ts`) consulta las **etiquetas (tags)** que el uploader cargó en el video
+activo — datos de género/estilo que YouTube guarda pero no muestra en ninguna parte de su propia
+interfaz — vía `videos.list`, y arma la consulta con hasta 3 de esas etiquetas
+(`fetchVideoTags` + `resolveSuggestionQuery`). Eso trae pistas de **artistas distintos pero de
+estilo similar**, que es la señal real de "pega con esta canción" — no "más de este canal". Si el
+video no tiene tags cargados (frecuente en subidas amateur) o la consulta de tags falla por
+cualquier motivo, cae de nuevo a buscar por artista, el comportamiento original, así que nunca
+queda sin sugerencias por esto. Al cambiar de tarjeta activa, la resolución de consulta + búsqueda
+esperan 500ms sin otro cambio antes de disparar (debounce) — recorrer varias tarjetas con las
+flechas o el swipe dispara una sola vez al asentarse, no una por tarjeta. Por este mismo motivo el
+título de la sección ya no dice "Sugeridos de {artista}" (dejó de ser siempre cierto) — quedó
+como "Sugeridos" a secas.
+
+**Costo de cuota de la consulta por tags:** `videos.list` cuesta 1 unidad contra las 100 de
+`search.list` — agregar esta consulta extra por cada búsqueda de sugerencias apenas mueve el total
+(de ~100 a ~101 unidades), así que el límite práctico sigue siendo las ~100 búsquedas/día del free
+tier, no esta llamada adicional.
 
 **Requiere una API key propia (`VITE_YOUTUBE_API_KEY`):** a diferencia del autocompletado del modal
-de agregar (que usa el endpoint público `oEmbed`, sin key), "encontrar videos relacionados" es una
-búsqueda real (`search.list` de la YouTube Data API v3), que YouTube solo permite con una API key.
-Como esta app no tiene backend, la key viaja como variable de entorno de Vite
-(`import.meta.env.VITE_YOUTUBE_API_KEY`) y queda embebida en el bundle público — por eso hay que
-restringirla en Google Cloud Console (por referer HTTP y por API habilitada) en vez de tratarla
-como un secreto. Ver `.env.example` para el detalle de cómo conseguirla y restringirla, y el
-`README.md` para dónde configurarla en desarrollo y en Vercel.
+de agregar (que usa el endpoint público `oEmbed`, sin key), tanto `videos.list` como `search.list`
+de la YouTube Data API v3 solo funcionan con una API key. Como esta app no tiene backend, la key
+viaja como variable de entorno de Vite (`import.meta.env.VITE_YOUTUBE_API_KEY`) y queda embebida
+en el bundle público — por eso hay que restringirla en Google Cloud Console (por referer HTTP y
+por API habilitada) en vez de tratarla como un secreto. Ver `.env.example` para el detalle de cómo
+conseguirla y restringirla, y el `README.md` para dónde configurarla en desarrollo y en Vercel.
 
-**Sin key configurada, o sin resultados, no se muestra nada:** `searchSuggestedVideos`
-(`lib/youtubeSuggestions.ts`) nunca tira una excepción — ante falta de key, cuota agotada, error de
-red o una respuesta que no sea OK, resuelve un array vacío, y el componente directamente no
-renderiza la tira (ni un mensaje de error) en cualquiera de esos casos. Es una funcionalidad
-accesoria: preferible que no se note a que rompa o ensucie la biblioteca con un error.
+**Sin key configurada, o sin resultados, no se muestra nada:** tanto `fetchVideoTags` como
+`searchSuggestedVideos` (`lib/youtubeSuggestions.ts`) nunca tiran una excepción — ante falta de
+key, cuota agotada, error de red o una respuesta que no sea OK, cada una resuelve un array vacío
+(`fetchVideoTags`, lo que a su vez hace que `resolveSuggestionQuery` caiga al artista) o directamente
+vacío (`searchSuggestedVideos`), y el componente no renderiza la tira (ni un mensaje de error) en
+cualquiera de esos casos. Es una funcionalidad accesoria: preferible que no se note a que rompa o
+ensucie la biblioteca con un error.
 
 **Antes de agregar, se verifica reproducibilidad:** igual que el modal de agregar, el botón "+" no
 agrega directamente — primero corre `lib/youtubeEmbedCheck.ts#checkVideoEmbeddable` (el mismo
@@ -500,10 +515,12 @@ chequeo con `YT.Player` oculto que detecta bloqueos de sello) y solo si el video
 `Track` y llama `onAddTrack`. La duración se completa con el mismo placeholder (180s) que usa el
 modal, y se autocorrige sola al reproducirse por primera vez (ver duración real más arriba).
 
-**Cache en memoria por sesión:** una búsqueda repetida para el mismo artista (p. ej. volver a pasar
-por la misma tarjeta) no vuelve a llamar a la API — se sirve desde un `Map` en memoria
-(`lib/youtubeSuggestions.ts`), ya que el free tier de la API es de solo ~100 búsquedas/día
-(10.000 unidades, 100 por búsqueda).
+**Cache en memoria por sesión — dos `Map` separados:** una consulta repetida (misma tarjeta
+revisitada) no vuelve a llamar a la API en ninguno de los dos pasos — `fetchVideoTags` cachea por
+id de video y `searchSuggestedVideos` cachea por consulta resuelta (`lib/youtubeSuggestions.ts`).
+Mantenerlos separados tiene sentido porque son costos muy distintos: `videos.list` es 1 unidad,
+`search.list` es 100 — cachear ambos por separado evita repetir la parte cara (la búsqueda) incluso
+si en algún momento se decide cachear la consulta de tags con otra política.
 
 **Ya en la biblioteca no se sugiere de nuevo:** las sugerencias se filtran contra
 `existingTrackIds` (los IDs de YouTube ya presentes en `tracks`), tanto en el resultado cacheado
